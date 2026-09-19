@@ -24,6 +24,7 @@ let myAvatarStyle = localStorage.getItem('dc_avatar_style') || 'bottts';
 let myCustomAvatar = localStorage.getItem('dc_custom_avatar');
 let myAvatar = myCustomAvatar || `https://api.dicebear.com/7.x/${myAvatarStyle}/svg?seed=${myUsername}`;
 let myBannerColor = localStorage.getItem('dc_banner_color') || '#f59e0b';
+let myBannerImage = localStorage.getItem('dc_banner_image') || '';
 let myBio = localStorage.getItem('dc_bio') || 'Membro oficial da TDL 🚀';
 let myRole = localStorage.getItem('dc_role') || 'owner';
 
@@ -156,6 +157,7 @@ function connectWebSocket() {
       username: myUsername,
       avatar: myAvatar,
       bannerColor: myBannerColor,
+      bannerImage: myBannerImage,
       bio: myBio,
       role: myRole
     });
@@ -1679,7 +1681,12 @@ function renderRoleSelectOptions() {
 function setBannerColorPreset(color) {
   myBannerColor = color;
   document.getElementById('inputBannerColor').value = color;
-  updateProfilePreview();
+  removeCustomBannerImage();
+}
+
+function onBannerColorInputChange() {
+  myBannerColor = document.getElementById('inputBannerColor').value;
+  removeCustomBannerImage();
 }
 
 function onAvatarStyleChange() {
@@ -1702,6 +1709,31 @@ function handleCustomAvatarUpload(event) {
   reader.readAsDataURL(file);
 }
 
+function handleCustomBannerUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    myBannerImage = reader.result;
+    localStorage.setItem('dc_banner_image', myBannerImage);
+    const removeBtn = document.getElementById('btnRemoveBannerImage');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+    updateProfilePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCustomBannerImage() {
+  myBannerImage = '';
+  localStorage.removeItem('dc_banner_image');
+  const removeBtn = document.getElementById('btnRemoveBannerImage');
+  if (removeBtn) removeBtn.classList.add('hidden');
+  const fileInput = document.getElementById('customBannerFileInput');
+  if (fileInput) fileInput.value = '';
+  updateProfilePreview();
+}
+
 function updateProfilePreview() {
   const name = document.getElementById('inputNickname')?.value.trim() || myUsername;
   const bannerColor = document.getElementById('inputBannerColor')?.value || myBannerColor;
@@ -1711,7 +1743,15 @@ function updateProfilePreview() {
   const role = (serverConfig.roles || []).find(r => r.id === roleId) || { name: 'MEMBRO TDL', color: '#949ba4' };
 
   const previewBanner = document.getElementById('previewBannerEl');
-  if (previewBanner) previewBanner.style.backgroundColor = bannerColor;
+  if (previewBanner) {
+    if (myBannerImage) {
+      previewBanner.style.backgroundImage = `url("${myBannerImage}")`;
+      previewBanner.style.backgroundColor = '';
+    } else {
+      previewBanner.style.backgroundImage = 'none';
+      previewBanner.style.backgroundColor = bannerColor;
+    }
+  }
 
   const previewAvatar = document.getElementById('previewModalAvatar');
   if (previewAvatar) previewAvatar.src = myAvatar;
@@ -1735,6 +1775,13 @@ function updateProfilePreview() {
 function openSettingsModal() {
   document.getElementById('settingsModal').classList.remove('hidden');
   updateMyProfileUI();
+
+  // Carregar estado do botão de remover banner
+  const removeBannerBtn = document.getElementById('btnRemoveBannerImage');
+  if (removeBannerBtn) {
+    if (myBannerImage) removeBannerBtn.classList.remove('hidden');
+    else removeBannerBtn.classList.add('hidden');
+  }
 
   // Carregar configurações de supressão de ruído
   const checkHighpass = document.getElementById('checkHighpass');
@@ -1766,7 +1813,6 @@ function saveProfileSettings() {
   const bannerColor = document.getElementById('inputBannerColor').value;
   const bio = document.getElementById('inputBio').value.trim();
   const roleId = document.getElementById('selectUserRole').value;
-  const noiseCheck = document.getElementById('checkNoiseSuppression');
 
   if (newName) {
     myUsername = newName;
@@ -1774,6 +1820,7 @@ function saveProfileSettings() {
   }
   myBannerColor = bannerColor;
   localStorage.setItem('dc_banner_color', myBannerColor);
+  localStorage.setItem('dc_banner_image', myBannerImage);
 
   myBio = bio;
   localStorage.setItem('dc_bio', myBio);
@@ -1793,6 +1840,7 @@ function saveProfileSettings() {
     username: myUsername,
     avatar: myAvatar,
     bannerColor: myBannerColor,
+    bannerImage: myBannerImage,
     bio: myBio,
     role: myRole
   });
@@ -1819,6 +1867,32 @@ function applyServerConfigUI() {
   } else {
     if (iconEl) iconEl.innerHTML = '👑';
     if (previewEl) previewEl.innerHTML = 'TDL';
+  }
+
+  // Banner do Servidor
+  const serverBannerHeader = document.getElementById('serverHeaderBanner');
+  const serverBannerPreview = document.getElementById('serverBannerPreview');
+  const btnRemoveBanner = document.getElementById('btnRemoveServerBanner');
+  if (serverConfig.server_banner) {
+    if (serverBannerHeader) {
+      serverBannerHeader.style.backgroundImage = `url("${serverConfig.server_banner}")`;
+      serverBannerHeader.classList.remove('hidden');
+    }
+    if (serverBannerPreview) {
+      serverBannerPreview.style.backgroundImage = `url("${serverConfig.server_banner}")`;
+      serverBannerPreview.innerHTML = '';
+    }
+    if (btnRemoveBanner) btnRemoveBanner.classList.remove('hidden');
+  } else {
+    if (serverBannerHeader) {
+      serverBannerHeader.classList.add('hidden');
+      serverBannerHeader.style.backgroundImage = 'none';
+    }
+    if (serverBannerPreview) {
+      serverBannerPreview.style.backgroundImage = 'none';
+      serverBannerPreview.innerHTML = '<span id="serverBannerPlaceholderText">Sem imagem de banner configurada</span>';
+    }
+    if (btnRemoveBanner) btnRemoveBanner.classList.add('hidden');
   }
 
   renderDynamicChannels();
@@ -1933,6 +2007,44 @@ function handleServerIconUpload(event) {
     });
   };
   reader.readAsDataURL(file);
+}
+
+function handleServerBannerUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const dataUrl = reader.result;
+    const preview = document.getElementById('serverBannerPreview');
+    if (preview) {
+      preview.style.backgroundImage = `url("${dataUrl}")`;
+      preview.innerHTML = '';
+    }
+    const removeBtn = document.getElementById('btnRemoveServerBanner');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+    sendWS({
+      type: 'update_server_settings',
+      serverBanner: dataUrl
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeServerBanner() {
+  const preview = document.getElementById('serverBannerPreview');
+  if (preview) {
+    preview.style.backgroundImage = 'none';
+    preview.innerHTML = '<span id="serverBannerPlaceholderText">Sem imagem de banner configurada</span>';
+  }
+  const removeBtn = document.getElementById('btnRemoveServerBanner');
+  if (removeBtn) removeBtn.classList.add('hidden');
+  const fileInput = document.getElementById('serverBannerFileInput');
+  if (fileInput) fileInput.value = '';
+  sendWS({
+    type: 'update_server_settings',
+    serverBanner: ''
+  });
 }
 
 function renderServerSettingsChannels() {
@@ -2082,6 +2194,7 @@ function openUserProfilePopout(userId, event) {
       username: myUsername,
       avatar: myAvatar,
       bannerColor: myBannerColor,
+      bannerImage: myBannerImage,
       bio: myBio,
       role: myRole
     };
@@ -2091,7 +2204,16 @@ function openUserProfilePopout(userId, event) {
   const userRole = getRoleForUser(user);
   const bannerColor = user.bannerColor || '#f59e0b';
 
-  document.getElementById('popoutBanner').style.backgroundColor = bannerColor;
+  const popoutBanner = document.getElementById('popoutBanner');
+  if (popoutBanner) {
+    if (user.bannerImage) {
+      popoutBanner.style.backgroundImage = `url("${user.bannerImage}")`;
+      popoutBanner.style.backgroundColor = '';
+    } else {
+      popoutBanner.style.backgroundImage = 'none';
+      popoutBanner.style.backgroundColor = bannerColor;
+    }
+  }
   document.getElementById('popoutAvatar').src = user.avatar;
   document.getElementById('popoutUsername').textContent = user.username;
   document.getElementById('popoutUsername').style.color = userRole ? userRole.color : '#fff';

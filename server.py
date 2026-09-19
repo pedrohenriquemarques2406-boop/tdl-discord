@@ -126,6 +126,7 @@ def get_server_state():
             "username": data.get("username", "Anônimo"),
             "avatar": data.get("avatar", ""),
             "bannerColor": data.get("banner_color", "#f59e0b"),
+            "bannerImage": data.get("banner_image", ""),
             "bio": data.get("bio", ""),
             "role": data.get("role", "member"),
             "voiceChannel": data.get("voice_channel"),
@@ -201,6 +202,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         "username": f"User_{client_id[:4]}",
         "avatar": f"https://api.dicebear.com/7.x/bottts/svg?seed={client_id}",
         "banner_color": "#f59e0b",
+        "banner_image": "",
         "bio": "Membro da Tropa do Liro (TDL) 🚀",
         "role": "owner" if len(clients) == 0 else "member",
         "voice_channel": None,
@@ -231,6 +233,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 "username": clients[client_id]["username"],
                 "avatar": clients[client_id]["avatar"],
                 "bannerColor": clients[client_id]["banner_color"],
+                "bannerImage": clients[client_id].get("banner_image", ""),
                 "bio": clients[client_id]["bio"],
                 "role": clients[client_id]["role"],
                 "voiceChannel": None,
@@ -248,12 +251,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 username = data.get("username", "").strip() or f"User_{client_id[:4]}"
                 avatar = data.get("avatar") or f"https://api.dicebear.com/7.x/bottts/svg?seed={username}"
                 banner_color = data.get("bannerColor", "#f59e0b")
+                banner_image = data.get("bannerImage", "")
                 bio = data.get("bio", "").strip()
                 role = data.get("role") or clients[client_id].get("role", "member")
 
                 clients[client_id]["username"] = username
                 clients[client_id]["avatar"] = avatar
                 clients[client_id]["banner_color"] = banner_color
+                clients[client_id]["banner_image"] = banner_image
                 clients[client_id]["bio"] = bio
                 clients[client_id]["role"] = role
 
@@ -264,6 +269,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "username": username,
                         "avatar": avatar,
                         "bannerColor": banner_color,
+                        "bannerImage": banner_image,
                         "bio": bio,
                         "role": role,
                         "voiceChannel": clients[client_id]["voice_channel"],

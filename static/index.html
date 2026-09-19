@@ -51,6 +51,9 @@
   <aside class="w-64 bg-[#2b2d31] flex flex-col flex-shrink-0 border-r border-[#1f2023] z-10">
     <!-- Cabeçalho do Servidor com Dropdown Estilo Discord -->
     <div class="relative">
+      <div id="serverHeaderBanner" class="hidden w-full h-28 bg-cover bg-center border-b border-[#1f2023] relative transition-all">
+        <div class="absolute inset-0 bg-gradient-to-t from-[#2b2d31] via-transparent to-black/30 pointer-events-none"></div>
+      </div>
       <header onclick="toggleServerDropdown(event)" class="h-12 border-b border-[#1f2023] px-4 flex items-center justify-between font-bold text-white shadow-sm cursor-pointer hover:bg-[#35373c] transition select-none">
         <span class="truncate flex items-center gap-2 text-sm">
           <span id="serverHeaderIcon" class="text-amber-400 font-extrabold text-base">👑</span>
@@ -397,17 +400,33 @@
             </div>
           </div>
 
-          <!-- Banner Color (Nitro Style) -->
+          <!-- Banner de Perfil (Estilo Nitro: Foto do PC ou Cor) -->
           <div>
-            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Cor do Banner (Estilo Nitro)</label>
-            <div class="flex items-center gap-2">
-              <input id="inputBannerColor" type="color" value="#f59e0b" onchange="updateProfilePreview()" class="w-10 h-8 rounded border-none bg-transparent cursor-pointer">
-              <div class="flex gap-1.5">
-                <button type="button" onclick="setBannerColorPreset('#f59e0b')" class="w-6 h-6 rounded-full bg-[#f59e0b] border border-white/20" title="Dourado TDL"></button>
-                <button type="button" onclick="setBannerColorPreset('#5865f2')" class="w-6 h-6 rounded-full bg-[#5865f2] border border-white/20" title="Blurple Discord"></button>
-                <button type="button" onclick="setBannerColorPreset('#ef4444')" class="w-6 h-6 rounded-full bg-[#ef4444] border border-white/20" title="Vermelho"></button>
-                <button type="button" onclick="setBannerColorPreset('#10b981')" class="w-6 h-6 rounded-full bg-[#10b981] border border-white/20" title="Esmeralda"></button>
-                <button type="button" onclick="setBannerColorPreset('#8b5cf6')" class="w-6 h-6 rounded-full bg-[#8b5cf6] border border-white/20" title="Roxo Cyber"></button>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Banner do Perfil (Estilo Nitro)</label>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('customBannerFileInput').click()" class="flex-1 px-3 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow">
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i> Subir Foto de Banner
+                </button>
+                <input type="file" id="customBannerFileInput" accept="image/*" class="hidden" onchange="handleCustomBannerUpload(event)">
+                <button type="button" onclick="removeCustomBannerImage()" id="btnRemoveBannerImage" class="hidden px-2.5 py-2 bg-[#da373c]/20 hover:bg-[#da373c] text-red-300 hover:text-white text-xs font-semibold rounded-lg transition" title="Remover imagem e usar cor">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Paleta de cores alternativa -->
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] text-[#949ba4]">Ou escolha uma cor sólida:</span>
+                <div class="flex items-center gap-1.5">
+                  <input id="inputBannerColor" type="color" value="#f59e0b" onchange="onBannerColorInputChange()" class="w-7 h-6 rounded border-none bg-transparent cursor-pointer">
+                  <div class="flex gap-1">
+                    <button type="button" onclick="setBannerColorPreset('#f59e0b')" class="w-5 h-5 rounded-full bg-[#f59e0b] border border-white/20" title="Dourado TDL"></button>
+                    <button type="button" onclick="setBannerColorPreset('#5865f2')" class="w-5 h-5 rounded-full bg-[#5865f2] border border-white/20" title="Blurple Discord"></button>
+                    <button type="button" onclick="setBannerColorPreset('#ef4444')" class="w-5 h-5 rounded-full bg-[#ef4444] border border-white/20" title="Vermelho"></button>
+                    <button type="button" onclick="setBannerColorPreset('#10b981')" class="w-5 h-5 rounded-full bg-[#10b981] border border-white/20" title="Esmeralda"></button>
+                    <button type="button" onclick="setBannerColorPreset('#8b5cf6')" class="w-5 h-5 rounded-full bg-[#8b5cf6] border border-white/20" title="Roxo Cyber"></button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -490,7 +509,7 @@
         <div class="flex flex-col items-center justify-center">
           <div class="text-xs font-bold text-[#949ba4] uppercase mb-2 tracking-wider">Prévia do seu Cartão</div>
           <div class="w-full max-w-[260px] rounded-2xl overflow-hidden shadow-2xl border border-[#3f4147] bg-[#232428]">
-            <div id="previewBannerEl" class="h-16 bg-[#f59e0b] relative transition-colors"></div>
+            <div id="previewBannerEl" class="h-20 bg-[#f59e0b] relative transition-all bg-cover bg-center overflow-hidden"></div>
             <div class="px-3 pb-3 relative pt-1">
               <div class="absolute -top-9 left-3">
                 <img id="previewModalAvatar" src="" class="w-14 h-14 rounded-full border-4 border-[#232428] bg-[#1e1f22] shadow object-cover">
@@ -638,6 +657,24 @@
               </div>
             </div>
           </div>
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Banner do Servidor</label>
+            <div class="space-y-3">
+              <div id="serverBannerPreview" class="w-full h-28 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 border border-white/20 shadow-inner flex items-center justify-center text-white/50 text-xs font-bold bg-cover bg-center overflow-hidden">
+                <span id="serverBannerPlaceholderText">Sem imagem de banner configurada</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('serverBannerFileInput').click()" class="px-4 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-md transition shadow flex items-center gap-1.5">
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i> Subir Foto de Banner do Servidor
+                </button>
+                <input type="file" id="serverBannerFileInput" accept="image/*" class="hidden" onchange="handleServerBannerUpload(event)">
+                <button type="button" onclick="removeServerBanner()" id="btnRemoveServerBanner" class="hidden px-3 py-2 bg-[#da373c]/20 hover:bg-[#da373c] text-red-300 hover:text-white text-xs font-semibold rounded-md transition">
+                  Remover Banner
+                </button>
+              </div>
+              <div class="text-[11px] text-[#949ba4]">Recomendado: 960x540 (formato widescreen 16:9). Exibido no topo dos canais.</div>
+            </div>
+          </div>
           <div class="pt-4">
             <button onclick="saveServerOverviewSettings()" class="px-6 py-2.5 bg-[#23a55a] hover:bg-[#1f9250] text-white text-sm font-bold rounded-lg shadow-lg transition">
               Salvar Alterações
@@ -727,8 +764,8 @@
 
   <!-- POPOUT FLUTUANTE DE PERFIL (Estilo Discord Card Oficial) -->
   <div id="userProfilePopout" class="fixed z-50 hidden w-72 rounded-2xl overflow-hidden shadow-2xl border border-[#3f4147] bg-[#232428] animate-in fade-in zoom-in-95 duration-150">
-    <!-- Banner Superior Colorido -->
-    <div id="popoutBanner" class="h-20 bg-gradient-to-r from-amber-600 to-orange-500 relative transition-colors">
+    <!-- Banner Superior Colorido ou com Imagem -->
+    <div id="popoutBanner" class="h-24 bg-gradient-to-r from-amber-600 to-orange-500 relative transition-all bg-cover bg-center overflow-hidden">
       <button onclick="closeUserProfilePopout()" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition">
         <i data-lucide="x" class="w-3.5 h-3.5"></i>
       </button>
