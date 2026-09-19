@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1f22"/>
+      <stop offset="50%" stop-color="#2b2d31"/>
+      <stop offset="100%" stop-color="#111214"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5865f2"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle / Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#goldGrad)" stroke-width="8" opacity="0.6"/>
+  
+  <!-- Rocket Icon -->
+  <g transform="translate(100, 90) scale(0.6)">
+    <!-- Fire Flame -->
+    <path d="M 260 420 C 260 490 200 520 180 500 C 160 480 180 430 190 400 Z" fill="#ef4444" opacity="0.9"/>
+    <path d="M 240 430 C 240 480 200 500 190 480 C 180 460 200 420 210 400 Z" fill="#f59e0b"/>
+    <!-- Rocket Body -->
+    <path d="M 260 60 C 350 140 370 280 340 370 L 260 350 L 180 370 C 150 280 170 140 260 60 Z" fill="url(#blueGrad)"/>
+    <!-- Wings -->
+    <path d="M 180 280 L 110 360 L 180 360 Z" fill="url(#goldGrad)"/>
+    <path d="M 340 280 L 410 360 L 340 360 Z" fill="url(#goldGrad)"/>
+    <!-- Window -->
+    <circle cx="260" cy="200" r="45" fill="#1e1f22" stroke="url(#goldGrad)" stroke-width="10"/>
+    <circle cx="260" cy="200" r="25" fill="#38bdf8"/>
+  </g>
+  
+  <!-- TDL Label -->
+  <text x="256" y="440" text-anchor="middle" fill="url(#goldGrad)" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="64" letter-spacing="4">TDL</text>
+</svg>

@@ -1,0 +1,75 @@
+{
+  "server_name": "TDL — Tropa do Liro",
+  "server_icon": "",
+  "server_banner": "",
+  "text_channels": [
+    {
+      "id": "resenha-tdl",
+      "name": "resenha-tdl",
+      "icon": "💬",
+      "topic": "Resenha oficial da Tropa do Liro (TDL) 🚀⚽"
+    },
+    {
+      "id": "rocket-league",
+      "name": "rocket-league",
+      "icon": "⚽",
+      "topic": "Dicas, treinos e partidas de Rocket League"
+    },
+    {
+      "id": "clipes-e-jogadas",
+      "name": "clipes-e-jogadas",
+      "icon": "🎥",
+      "topic": "Mande prints, gols e jogadas épicas"
+    },
+    {
+      "id": "comandos",
+      "name": "comandos",
+      "icon": "🤖",
+      "topic": "Comandos e novidades do bot"
+    }
+  ],
+  "voice_channels": [
+    {
+      "id": "rl-ranked",
+      "name": "⚽ Rocket League 1 (Ranked)"
+    },
+    {
+      "id": "rl-casual",
+      "name": "⚽ Rocket League 2 (Casual)"
+    },
+    {
+      "id": "stream-tela",
+      "name": "🖥️ Transmissão & Tela"
+    },
+    {
+      "id": "sala-vip",
+      "name": "👑 Sala VIP da Tropa"
+    }
+  ],
+  "roles": [
+    {
+      "id": "owner",
+      "name": "👑 FUNDADOR",
+      "color": "#f59e0b",
+      "is_admin": true
+    },
+    {
+      "id": "mod",
+      "name": "🛡️ MODERADOR",
+      "color": "#3b82f6",
+      "is_admin": false
+    },
+    {
+      "id": "pro",
+      "name": "⚽ ROCKET PRO",
+      "color": "#10b981",
+      "is_admin": false
+    },
+    {
+      "id": "member",
+      "name": "🚀 MEMBRO TDL",
+      "color": "#949ba4",
+      "is_admin": false
+    }
+  ]
+}
