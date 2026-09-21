@@ -111,17 +111,6 @@
           <!-- Gerado dinamicamente via JS -->
         </div>
       </div>
-
-      <!-- Meme Breno Quick Button -->
-      <div class="pt-2">
-        <button onclick="openSettingsModal()" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-xs transition group">
-          <div class="flex items-center gap-2 truncate">
-            <span class="text-sm">📢</span>
-            <span class="truncate">Grito do Breno</span>
-          </div>
-          <span class="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200 group-hover:bg-amber-500/30 font-bold">MEME</span>
-        </button>
-      </div>
     </div>
 
     <!-- Barra de Voz Conectada (Aparece quando o usuário entra num canal de voz) -->
@@ -613,10 +602,6 @@
               <i data-lucide="shield" class="w-4 h-4"></i>
               <span>Cargos & Roles</span>
             </button>
-            <button onclick="switchServerTab('sounds')" id="tabBtn-sounds" class="server-tab-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c] transition">
-              <i data-lucide="megaphone" class="w-4 h-4"></i>
-              <span>Meme da Tropa</span>
-            </button>
           </nav>
         </div>
 
@@ -740,26 +725,6 @@
           </div>
         </div>
 
-        <!-- ABA 4: MEME DA TROPA -->
-        <div id="serverTab-sounds" class="server-tab-content hidden space-y-6 max-w-xl">
-          <h2 class="text-xl font-bold text-white">Sons de Entrada da Call</h2>
-          <div class="p-4 bg-[#2b2d31] rounded-xl border border-amber-500/30 space-y-3">
-            <div class="text-sm font-bold text-amber-400">Grito do Breno ("AÍ MEU CU!")</div>
-            <p class="text-xs text-[#949ba4]">Toca automaticamente para todos quando qualquer pessoa entra na sala de voz.</p>
-            <div class="flex flex-wrap gap-2">
-              <button onclick="testBrenoSound()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded transition">
-                ▶️ Ouvir Grito
-              </button>
-              <button onclick="toggleRecordBreno()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded transition">
-                🎙️ Gravar Breno Agora
-              </button>
-              <button onclick="document.getElementById('brenoAudioFileInput').click()" class="px-4 py-2 bg-[#35373c] hover:bg-[#404249] text-white text-xs font-bold rounded transition">
-                📁 Subir Áudio
-              </button>
-            </div>
-          </div>
-        </div>
-
       </main>
     </div>
   </div>
@@ -867,9 +832,9 @@
     </div>
   </div>
 
-  <!-- Audio elements invisíveis para reprodução WebRTC de outros usuários -->
-  <div id="remoteAudioContainer" class="hidden"></div>
+  <!-- Audio elements invisíveis para reprodução WebRTC de outros usuários (não usar display:none para o Chrome não silenciar o áudio) -->
+  <div id="remoteAudioContainer" style="position:fixed;bottom:0;right:0;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-1;"></div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=2.3"></script>
 </body>
 </html>

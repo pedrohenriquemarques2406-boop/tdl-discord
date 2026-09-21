@@ -122,10 +122,36 @@ document.addEventListener('DOMContentLoaded', () => {
   connectWebSocket();
 });
 
+// Gerenciador Global de Áudio para Sons do Sistema (Discord & Memes)
+let globalSoundCtx = null;
+
+function getGlobalAudioContext() {
+  if (!globalSoundCtx || globalSoundCtx.state === 'closed') {
+    globalSoundCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (globalSoundCtx.state === 'suspended') {
+    globalSoundCtx.resume().catch(() => {});
+  }
+  return globalSoundCtx;
+}
+
+// Desbloquear o AudioContext global em qualquer ação do usuário na janela
+['click', 'keydown', 'touchstart', 'mousedown', 'pointerdown'].forEach(evt => {
+  window.addEventListener(evt, () => {
+    const ctx = getGlobalAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  }, { passive: true });
+});
+
 // Reproduzir Chimes de Áudio estilo Discord via Web Audio Sintetizado
-function playDiscordSound(type = 'join') {
+async function playDiscordSound(type = 'join') {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getGlobalAudioContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume().catch(() => {});
+    }
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -133,28 +159,28 @@ function playDiscordSound(type = 'join') {
     gain.connect(ctx.destination);
 
     if (type === 'join') {
-      // Tom duplo agradável estilo Discord Connect (D5 -> G5)
+      // Tom duplo clássico de entrada estilo Discord (D5 -> G5)
       osc.type = 'sine';
       osc.frequency.setValueAtTime(587.33, now); // D5
       osc.frequency.setValueAtTime(783.99, now + 0.12); // G5
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
       osc.start(now);
-      osc.stop(now + 0.35);
+      osc.stop(now + 0.4);
     } else if (type === 'leave') {
       // Tom descendente Discord Disconnect (G5 -> D5)
       osc.type = 'sine';
       osc.frequency.setValueAtTime(783.99, now);
       osc.frequency.setValueAtTime(587.33, now + 0.12);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
       osc.start(now);
-      osc.stop(now + 0.35);
+      osc.stop(now + 0.4);
     } else if (type === 'message') {
       // Som suave de mensagem nova
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(800, now);
-      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.setValueAtTime(0.15, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
       osc.start(now);
       osc.stop(now + 0.15);
@@ -583,9 +609,16 @@ async function joinVoiceChannel(channelName) {
     leaveVoiceChannel(false);
   }
 
+  // Desbloquear AudioContext nativamente no clique de entrada
+  try {
+    const ctx = getGlobalAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  } catch (e) {}
+
   currentVoiceChannel = channelName;
   playDiscordSound('join');
-  setTimeout(playBrenoEntranceSound, 300);
 
   // Adquirir Microfone local com Supressão Avançada Anti-Ruído, Anti-Ventilador e Anti-Teclado
   try {
@@ -725,45 +758,17 @@ async function handleUserJoinedVoice(user, channelName) {
   renderUserInStageGrid(user.id, user.username, user.avatar, user.state);
   updateStageParticipantsCount();
   playDiscordSound('join');
-  setTimeout(playBrenoEntranceSound, 300);
 
-  // Se já estiver transmitindo tela, garantir envio para o novo usuário de forma segura
-  if (isScreenSharing && localScreenStream) {
-    setTimeout(async () => {
-      let conn = peerConnections[user.id];
-      let pc;
-      if (!conn) {
-        pc = await createPeerConnection(user.id, user.username, true);
-        conn = peerConnections[user.id];
-      } else {
-        pc = conn.pc;
-      }
-
-      if (pc) {
-        localScreenStream.getTracks().forEach(track => {
-          const sender = addTrackSafely(pc, track, localScreenStream);
-          if (track.kind === 'video' && sender) {
-            tuneSenderBitrate(sender);
-          }
-        });
-
-        // Se a conexão já estiver estável, renegocia a oferta com a tela
-        if (pc.signalingState === 'stable') {
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendWS({
-              type: 'webrtc_signal',
-              targetId: user.id,
-              signal: { sdp: pc.localDescription }
-            });
-          } catch (e) {
-            console.warn("[WebRTC] Erro ao renegociar tela para novo membro:", e);
-          }
-        }
-      }
-    }, 600);
-  }
+  // O novo usuário que acabou de entrar é quem inicia a oferta para nós (handleJoinedVoiceSuccess).
+  // Se estivermos transmitindo tela, nossa tela já será incluída diretamente na resposta (answer)
+  // graças ao transceiver 'recvonly' pré-alocado pelo iniciador!
+  // Fallback de segurança: se após 2.5s nenhuma conexão foi estabelecida, conectamos como fallback
+  setTimeout(async () => {
+    if (currentVoiceChannel === channelName && !peerConnections[user.id]) {
+      console.log("[WebRTC] Fallback de conexão para novo membro:", user.id);
+      await createPeerConnection(user.id, user.username, true);
+    }
+  }, 2500);
 }
 
 function handleUserLeftVoice(userId) {
@@ -811,6 +816,15 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
     localCameraStream.getTracks().forEach(track => {
       addTrackSafely(pc, track, localCameraStream);
     });
+  } else {
+    // Se não estamos transmitindo tela, reservamos o canal de vídeo 'recvonly'
+    // Assim, se o outro lado estiver compartilhando tela, a tela chega IMEDIATAMENTE
+    // na primeira conexão, sem depender de renegociações secundárias!
+    try {
+      pc.addTransceiver('video', { direction: 'recvonly' });
+    } catch (e) {
+      console.warn("[WebRTC] Aviso ao adicionar transceiver de vídeo:", e);
+    }
   }
 
   // Candidatos ICE
@@ -929,27 +943,32 @@ async function handleWebRTCSignal(data) {
           signal: { sdp: pc.localDescription }
         });
 
-        // Se estamos transmitindo tela e o novo peer conectou, renegociar para enviar o vídeo
+        // Se estamos transmitindo tela e o novo peer conectou:
+        // O track já foi adicionado no createPeerConnection e enviado diretamente no answer.
+        // Apenas se o peer não negociou vídeo (ex: cliente legado), fazemos a oferta de contingência.
         if (isScreenSharing && localScreenStream) {
-          setTimeout(async () => {
-            if (pc.signalingState === 'stable') {
-              localScreenStream.getTracks().forEach(t => {
-                const s = addTrackSafely(pc, t, localScreenStream);
-                if (t.kind === 'video' && s) tuneSenderBitrate(s);
-              });
-              try {
-                const renegotiateOffer = await pc.createOffer();
-                await pc.setLocalDescription(renegotiateOffer);
-                sendWS({
-                  type: 'webrtc_signal',
-                  targetId: senderId,
-                  signal: { sdp: pc.localDescription }
+          const hasVideoNegotiated = pc.getTransceivers ? pc.getTransceivers().some(t => (t.currentDirection === 'sendonly' || t.currentDirection === 'sendrecv') && t.sender && t.sender.track && t.sender.track.kind === 'video') : false;
+          if (!hasVideoNegotiated) {
+            setTimeout(async () => {
+              if (pc.signalingState === 'stable') {
+                localScreenStream.getTracks().forEach(t => {
+                  const s = addTrackSafely(pc, t, localScreenStream);
+                  if (t.kind === 'video' && s) tuneSenderBitrate(s);
                 });
-              } catch (reErr) {
-                console.warn("[WebRTC] Erro ao renegociar tela pós-answer:", reErr);
+                try {
+                  const renegotiateOffer = await pc.createOffer();
+                  await pc.setLocalDescription(renegotiateOffer);
+                  sendWS({
+                    type: 'webrtc_signal',
+                    targetId: senderId,
+                    signal: { sdp: pc.localDescription }
+                  });
+                } catch (reErr) {
+                  console.warn("[WebRTC] Erro ao renegociar tela pós-answer:", reErr);
+                }
               }
-            }
-          }, 300);
+            }, 400);
+          }
         }
       }
     } catch (err) {
@@ -1273,18 +1292,22 @@ function unlockAllAudio() {
   }
 }
 
-// Desbloquear áudio de voz no primeiro clique de qualquer pessoa
-window.addEventListener('click', () => {
-  unlockAllAudio();
-  const banner = document.getElementById('audioUnlockBanner');
-  if (banner) banner.remove();
-}, { once: true });
+// Desbloquear áudio de voz em qualquer interação do usuário (clique, toque ou tecla)
+['click', 'touchstart', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, () => {
+    unlockAllAudio();
+    const banner = document.getElementById('audioUnlockBanner');
+    if (banner) banner.remove();
+  }, { passive: true });
+});
 
 function removeUserFromStageGrid(userId) {
   const card = document.getElementById('stage-card-' + userId);
   if (card) card.remove();
   const videoCard = document.getElementById('video-card-' + userId);
   if (videoCard) videoCard.remove();
+  const streamAudio = document.getElementById('stream-audio-' + userId);
+  if (streamAudio) streamAudio.remove();
 }
 
 function renderLocalVideo(stream, label) {
@@ -1327,7 +1350,7 @@ function attachRemoteVideo(targetId, targetUsername, stream) {
     videoCard.id = 'video-card-' + targetId;
     videoCard.className = 'video-card min-h-[180px] col-span-1 sm:col-span-2 relative bg-black rounded-lg overflow-hidden border-2 border-amber-500/70 shadow-2xl';
     videoCard.innerHTML = `
-      <video id="remote-video-${targetId}" autoplay playsinline class="w-full h-full object-contain"></video>
+      <video id="remote-video-${targetId}" autoplay muted playsinline class="w-full h-full object-contain"></video>
       <div class="absolute top-2 left-2 flex items-center gap-2 bg-black/60 backdrop-blur px-2.5 py-1 rounded-md text-xs font-bold text-white">
         <span class="w-2 h-2 rounded-full bg-[#da373c] animate-pulse"></span>
         <span>AO VIVO — Tela de ${targetUsername}</span>
@@ -1336,8 +1359,8 @@ function attachRemoteVideo(targetId, targetUsername, stream) {
       <!-- Barra de Controle de Áudio da Tela (Slider de Volume) -->
       <div class="absolute bottom-2 right-2 flex items-center gap-2 bg-black/75 backdrop-blur px-2.5 py-1.5 rounded-lg border border-white/10 shadow-lg">
         <i data-lucide="volume-2" class="w-3.5 h-3.5 text-amber-400"></i>
-        <input type="range" min="0" max="1" step="0.05" value="0.4" oninput="setStreamVolume('${targetId}', this.value)" class="w-16 sm:w-20 accent-amber-500 cursor-pointer h-1.5" title="Ajustar Volume do Jogo">
-        <span id="vol-label-${targetId}" class="text-[11px] font-bold text-white w-7 text-right">40%</span>
+        <input type="range" min="0" max="1" step="0.05" value="0.5" oninput="setStreamVolume('${targetId}', this.value)" class="w-16 sm:w-20 accent-amber-500 cursor-pointer h-1.5" title="Ajustar Volume do Jogo">
+        <span id="vol-label-${targetId}" class="text-[11px] font-bold text-white w-7 text-right">50%</span>
         <button onclick="toggleFullScreen('remote-video-${targetId}')" class="p-1 rounded hover:bg-white/20 text-white ml-1 transition" title="Tela Cheia">
           <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
         </button>
@@ -1348,15 +1371,38 @@ function attachRemoteVideo(targetId, targetUsername, stream) {
   }
 
   const video = document.getElementById(`remote-video-${targetId}`);
-  video.srcObject = stream;
-  video.volume = 0.4; // Volume inicial em 40% para não estourar o áudio da live!
+  if (video) {
+    video.srcObject = stream;
+    video.muted = true; // OBRIGATÓRIO: muted para o navegador NUNCA bloquear autoplay da tela!
+    video.play().catch(e => {
+      console.warn("Aviso de reprodução de vídeo:", e);
+    });
+  }
+
+  // Reproduzir áudio da transmissão via elemento de áudio dedicado
+  const audioTracks = stream.getAudioTracks();
+  if (audioTracks && audioTracks.length > 0) {
+    let streamAudio = document.getElementById(`stream-audio-${targetId}`);
+    if (!streamAudio) {
+      streamAudio = document.createElement('audio');
+      streamAudio.id = `stream-audio-${targetId}`;
+      streamAudio.autoplay = true;
+      document.getElementById('remoteAudioContainer').appendChild(streamAudio);
+    }
+    streamAudio.srcObject = new MediaStream(audioTracks);
+    streamAudio.volume = 0.5;
+    streamAudio.play().catch(e => {
+      console.warn("Áudio da transmissão aguardando interação:", e);
+      showAudioUnlockBanner();
+    });
+  }
 }
 
 function setStreamVolume(targetId, val) {
-  const video = document.getElementById(`remote-video-${targetId}`);
+  const streamAudio = document.getElementById(`stream-audio-${targetId}`);
   const label = document.getElementById(`vol-label-${targetId}`);
-  if (video) {
-    video.volume = parseFloat(val);
+  if (streamAudio) {
+    streamAudio.volume = parseFloat(val);
   }
   if (label) {
     label.textContent = Math.round(val * 100) + '%';
@@ -1404,9 +1450,10 @@ function setupAudioProcessingPipeline(stream) {
     highpassNode.Q.value = 0.707;
 
     // 2. Portão de Ruído (Noise Gate Gain Node):
-    // Quando fechado (0.0), silêncio absoluto. Quando aberto (1.0), voz limpa.
+    // Inicia aberto em 1.0 para que a voz nunca seja cortada por engano
     gateGainNode = audioCtx.createGain();
-    gateGainNode.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    gateGainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+    isGateOpen = true;
 
     // 3. Analisador para detecção de energia e sensibilidade
     micAnalyser = audioCtx.createAnalyser();
@@ -1464,14 +1511,10 @@ function startNoiseGateLoop() {
 
     updateMicMeterUI(currentLevel);
 
-    // Limiar do Portão de Ruído (Noise Gate)
-    let threshold = userGateThreshold;
+    // Limiar sensível para não cortar sussurros ou vozes baixas
+    let threshold = 6;
     if (isAutoGate) {
-      // Calibração dinâmica com ruído de fundo da sala (ventilador, etc.)
-      if (currentLevel < autoNoiseFloor + 5) {
-        autoNoiseFloor = autoNoiseFloor * 0.96 + currentLevel * 0.04;
-      }
-      threshold = Math.max(14, Math.min(45, Math.round(autoNoiseFloor + 8)));
+      threshold = Math.max(5, Math.min(25, Math.round(autoNoiseFloor + 4)));
       updateGateMarkerUI(threshold);
     } else {
       updateGateMarkerUI(userGateThreshold);
@@ -2453,191 +2496,14 @@ function toggleMemberList() {
 }
 
 // ----------------------------------------------------
-// 8. MEME DA TROPA: GRITO DO BRENO ("AÍ MEU CU!")
+// 8. CONTROLE DE SONS (MEME DO BRENO DESATIVADO)
 // ----------------------------------------------------
-function playBrenoEntranceSound() {
-  const isEnabled = localStorage.getItem('dc_breno_meme') !== 'false';
-  if (!isEnabled) return;
-
-  if (customJoinSoundUrl) {
-    try {
-      const audio = new Audio(customJoinSoundUrl);
-      audio.volume = 1.0;
-      audio.play().catch(e => {
-        console.warn("Autoplay impedido ou arquivo inválido, tocando sintetizado:", e);
-        playBrenoSynthScream();
-      });
-      return;
-    } catch (e) {
-      console.warn("Erro ao tocar áudio customizado:", e);
-    }
-  }
-  playBrenoSynthScream();
-}
-
-function playBrenoSynthScream() {
-  // 1. Efeito de áudio sintetizado caricato (Web Audio API)
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const now = ctx.currentTime;
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(180, now + 0.6);
-
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.linearRampToValueAtTime(0.35, now + 0.12);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.65);
-  } catch (e) {}
-
-  // 2. TTS Gritando em português
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance("AÍ MEU CU!");
-      utter.lang = 'pt-BR';
-      utter.pitch = 2.0; // Agudo/esganiçado
-      utter.rate = 1.4;  // Rápido
-      utter.volume = 1.0;
-      window.speechSynthesis.speak(utter);
-    } catch (e) {}
-  }
-}
-
-function testBrenoSound() {
-  playBrenoEntranceSound();
-}
-
-function updateBrenoSoundUI() {
-  const statusEl = document.getElementById('brenoStatusText');
-  const checkEl = document.getElementById('checkBrenoMeme');
-  if (checkEl) {
-    checkEl.checked = localStorage.getItem('dc_breno_meme') !== 'false';
-  }
-  if (statusEl) {
-    if (customJoinSoundUrl) {
-      statusEl.innerHTML = '🔥 <b>Áudio oficial do Breno carregado!</b> (Grito real ativo)';
-      statusEl.parentElement.className = 'text-[11px] text-amber-300 font-medium bg-[#1e1f22] p-2 rounded flex items-center gap-1.5 border border-amber-500/40';
-    } else {
-      statusEl.innerHTML = '🔊 Grito sintetizado ativo ("AÍ MEU CU!")';
-      statusEl.parentElement.className = 'text-[11px] text-[#23a55a] font-medium bg-[#1e1f22] p-2 rounded flex items-center gap-1.5';
-    }
-  }
-}
-
-async function toggleRecordBreno() {
-  const btn = document.getElementById('btnRecordBreno');
-  const label = document.getElementById('recordBrenoLabel');
-
-  if (isRecordingBreno) {
-    if (brenoRecorder && brenoRecorder.state === 'recording') {
-      brenoRecorder.stop();
-    }
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    brenoRecordChunks = [];
-    brenoRecorder = new MediaRecorder(stream);
-
-    brenoRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) brenoRecordChunks.push(e.data);
-    };
-
-    brenoRecorder.onstop = async () => {
-      isRecordingBreno = false;
-      label.textContent = 'Gravar Breno';
-      btn.className = 'bg-[#da373c] hover:bg-red-600 text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center gap-1 transition shadow';
-      stream.getTracks().forEach(t => t.stop());
-
-      const blob = new Blob(brenoRecordChunks, { type: 'audio/webm' });
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Audio = reader.result;
-        label.textContent = 'Salvando...';
-        try {
-          const resp = await fetch('/api/upload-breno-sound', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ audioData: base64Audio })
-          });
-          const res = await resp.json();
-          if (res.success) {
-            customJoinSoundUrl = res.url;
-            updateBrenoSoundUI();
-            testBrenoSound();
-            label.textContent = 'Salvo! ✅';
-            setTimeout(() => { label.textContent = 'Gravar Breno'; }, 2500);
-          } else {
-            alert('Erro ao salvar áudio: ' + (res.error || 'Desconhecido'));
-          }
-        } catch (err) {
-          alert('Erro de conexão ao salvar: ' + err.message);
-        }
-      };
-      reader.readAsDataURL(blob);
-    };
-
-    brenoRecorder.start();
-    isRecordingBreno = true;
-    btn.className = 'bg-red-700 animate-pulse text-white text-xs font-bold py-2 px-2 rounded flex items-center justify-center gap-1 transition shadow';
-
-    let seconds = 3;
-    label.textContent = `🔴 Gritando... ${seconds}s`;
-    const interval = setInterval(() => {
-      seconds--;
-      if (seconds > 0 && isRecordingBreno) {
-        label.textContent = `🔴 Gritando... ${seconds}s`;
-      } else {
-        clearInterval(interval);
-        if (brenoRecorder && brenoRecorder.state === 'recording') {
-          brenoRecorder.stop();
-        }
-      }
-    }, 1000);
-
-  } catch (err) {
-    alert('Permissão de microfone negada ou indisponível: ' + err.message);
-  }
-}
-
-async function uploadBrenoAudioFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  const statusEl = document.getElementById('brenoStatusText');
-  if (statusEl) statusEl.textContent = 'Enviando áudio do Breno...';
-
-  reader.onloadend = async () => {
-    try {
-      const resp = await fetch('/api/upload-breno-sound', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioData: reader.result })
-      });
-      const res = await resp.json();
-      if (res.success) {
-        customJoinSoundUrl = res.url;
-        updateBrenoSoundUI();
-        testBrenoSound();
-      } else {
-        alert('Erro ao enviar áudio: ' + (res.error || 'Desconhecido'));
-      }
-    } catch (err) {
-      alert('Erro na conexão: ' + err.message);
-    }
-  };
-  reader.readAsDataURL(file);
-}
+function playBrenoEntranceSound() {}
+function playBrenoSynthScream() {}
+function testBrenoSound() {}
+function updateBrenoSoundUI() {}
+function toggleRecordBreno() {}
+function uploadBrenoAudioFile() {}
 
 // ----------------------------------------------------
 // 9. AUTO-UPDATE (HOT SYNC SEM F5) & APLICATIVO PWA
