@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TDL — Tropa do Liro | Rocket League & Tela</title>
+  <!-- PWA & Mobile Icons -->
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+  <meta name="theme-color" content="#1e1f22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TDL Discord">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="h-full flex overflow-hidden bg-[#1e1f22] text-[#dbdee1]">
+
+  <!-- 1. BARRA DE SERVIDORES (Esquerda Extrema) -->
+  <nav class="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 space-y-2 select-none border-r border-[#1a1b1e] flex-shrink-0 z-20">
+    <!-- Home / Discord Icon -->
+    <div class="group relative flex items-center justify-center w-full">
+      <div class="absolute left-0 w-1 bg-white rounded-r transition-all duration-200 h-5 group-hover:h-8"></div>
+      <button class="w-12 h-12 rounded-[24px] group-hover:rounded-[16px] bg-[#5865f2] text-white flex items-center justify-center transition-all duration-200 shadow-lg">
+        <i data-lucide="gamepad-2" class="w-7 h-7"></i>
+      </button>
+    </div>
+
+    <div class="w-8 h-[2px] bg-[#35363c] rounded my-1"></div>
+
+    <!-- Nosso Servidor Principal TDL -->
+    <div class="group relative flex items-center justify-center w-full">
+      <div id="serverPill" class="absolute left-0 w-1 bg-amber-400 rounded-r transition-all duration-200 h-10"></div>
+      <button class="w-12 h-12 rounded-[16px] bg-gradient-to-br from-amber-600 via-orange-600 to-amber-500 text-white flex items-center justify-center font-extrabold text-base transition-all duration-200 shadow-lg tracking-wider border border-amber-400/30">
+        TDL
+      </button>
+    </div>
+
+    <!-- Botão Configurar Perfil -->
+    <div class="group relative flex items-center justify-center w-full">
+      <button onclick="openSettingsModal()" class="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-amber-500 text-amber-400 hover:text-white flex items-center justify-center transition-all duration-200" title="Configurar Perfil">
+        <i data-lucide="user-cog" class="w-6 h-6"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- 2. BARRA DE CANAIS E USUÁRIO (Sidebar) -->
+  <aside class="w-64 bg-[#2b2d31] flex flex-col flex-shrink-0 border-r border-[#1f2023] z-10">
+    <!-- Cabeçalho do Servidor com Dropdown Estilo Discord -->
+    <div class="relative">
+      <div id="serverHeaderBanner" class="hidden w-full h-28 bg-cover bg-center border-b border-[#1f2023] relative transition-all">
+        <div class="absolute inset-0 bg-gradient-to-t from-[#2b2d31] via-transparent to-black/30 pointer-events-none"></div>
+      </div>
+      <header onclick="toggleServerDropdown(event)" class="h-12 border-b border-[#1f2023] px-4 flex items-center justify-between font-bold text-white shadow-sm cursor-pointer hover:bg-[#35373c] transition select-none">
+        <span class="truncate flex items-center gap-2 text-sm">
+          <span id="serverHeaderIcon" class="text-amber-400 font-extrabold text-base">👑</span>
+          <span id="serverHeaderName" class="truncate">TDL — Tropa do Liro</span>
+        </span>
+        <i id="serverChevronIcon" data-lucide="chevron-down" class="w-4 h-4 text-[#949ba4] transition-transform"></i>
+      </header>
+
+      <!-- Dropdown Menu Estilo Discord Oficial -->
+      <div id="serverDropdownMenu" class="absolute top-13 left-2 right-2 bg-[#111214] border border-[#2b2d31] rounded-lg shadow-2xl p-1.5 z-50 hidden space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+        <button onclick="openServerSettingsModal('overview')" class="w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold text-[#dbdee1] hover:bg-[#5865f2] hover:text-white transition group">
+          <span>Configurações do Servidor</span>
+          <i data-lucide="settings" class="w-4 h-4 text-[#949ba4] group-hover:text-white"></i>
+        </button>
+        <button onclick="openCreateChannelModal('text')" class="w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold text-[#dbdee1] hover:bg-[#5865f2] hover:text-white transition group">
+          <span>Criar Canal</span>
+          <i data-lucide="plus-circle" class="w-4 h-4 text-[#949ba4] group-hover:text-white"></i>
+        </button>
+        <button onclick="openServerSettingsModal('roles')" class="w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold text-[#dbdee1] hover:bg-[#5865f2] hover:text-white transition group">
+          <span>Gerenciar Cargos</span>
+          <i data-lucide="shield" class="w-4 h-4 text-[#949ba4] group-hover:text-white"></i>
+        </button>
+        <div class="h-[1px] bg-[#232428] my-1"></div>
+        <button onclick="triggerForceReloadAll()" class="w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-semibold text-amber-400 hover:bg-amber-600 hover:text-white transition group">
+          <span>Atualizar Tela de Todos</span>
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-amber-400 group-hover:text-white"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista de Canais -->
+    <div class="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+      <!-- Canais de Texto -->
+      <div>
+        <div class="px-2 mb-1 flex items-center justify-between text-[11px] font-bold tracking-wider text-[#949ba4] uppercase">
+          <span>Canais de Texto</span>
+          <button onclick="openCreateChannelModal('text')" class="p-1 hover:text-white transition rounded hover:bg-[#35373c]" title="Criar Canal de Texto">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+        <div class="space-y-0.5" id="textChannelsList">
+          <!-- Gerado dinamicamente via JS -->
+        </div>
+      </div>
+
+      <!-- Canais de Voz & Tela -->
+      <div>
+        <div class="px-2 mb-1 flex items-center justify-between text-[11px] font-bold tracking-wider text-[#949ba4] uppercase">
+          <span>Canais de Voz</span>
+          <button onclick="openCreateChannelModal('voice')" class="p-1 hover:text-white transition rounded hover:bg-[#35373c]" title="Criar Canal de Voz">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+        <div class="space-y-1" id="voiceChannelsContainer">
+          <!-- Gerado dinamicamente via JS -->
+        </div>
+      </div>
+
+      <!-- Meme Breno Quick Button -->
+      <div class="pt-2">
+        <button onclick="openSettingsModal()" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-xs transition group">
+          <div class="flex items-center gap-2 truncate">
+            <span class="text-sm">📢</span>
+            <span class="truncate">Grito do Breno</span>
+          </div>
+          <span class="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-200 group-hover:bg-amber-500/30 font-bold">MEME</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra de Voz Conectada (Aparece quando o usuário entra num canal de voz) -->
+    <div id="voiceConnectedPanel" class="bg-[#232428] border-b border-[#1f2023] p-2.5 flex items-center justify-between hidden">
+      <div class="flex items-center gap-2 overflow-hidden">
+        <div class="w-3 h-3 rounded-full bg-[#23a55a] animate-pulse"></div>
+        <div class="flex flex-col truncate">
+          <span class="text-xs font-semibold text-[#23a55a] flex items-center gap-1">
+            Voz Conectada
+          </span>
+          <span id="connectedVoiceName" class="text-xs text-[#949ba4] truncate">Sala Principal</span>
+        </div>
+      </div>
+      <button onclick="leaveVoiceChannel()" class="p-1.5 rounded hover:bg-[#35373c] text-[#da373c] hover:text-red-400 transition" title="Desconectar da chamada">
+        <i data-lucide="phone-off" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Rodapé de Perfil do Usuário -->
+    <footer class="h-[52px] bg-[#232428] px-2 flex items-center justify-between">
+      <div onclick="openSettingsModal()" class="flex items-center gap-2 p-1 rounded-md hover:bg-[#35373c] cursor-pointer max-w-[130px] transition">
+        <div class="relative">
+          <img id="myAvatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=user" alt="Avatar" class="w-8 h-8 rounded-full bg-[#1e1f22]">
+          <div class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#23a55a] border-2 border-[#232428]"></div>
+        </div>
+        <div class="truncate">
+          <div id="myUsername" class="text-sm font-semibold text-white leading-tight truncate">Conectando...</div>
+          <div class="text-[11px] text-[#949ba4] leading-none">Online</div>
+        </div>
+      </div>
+
+      <!-- Controles rápidos: Mic, Fone, Configurações -->
+      <div class="flex items-center">
+        <button id="btnToggleMic" onclick="toggleMute()" class="p-1.5 rounded hover:bg-[#35373c] text-[#b5bac1] hover:text-white transition" title="Mutar Microfone">
+          <i id="iconMic" data-lucide="mic" class="w-4 h-4"></i>
+        </button>
+        <button id="btnToggleDeaf" onclick="toggleDeafen()" class="p-1.5 rounded hover:bg-[#35373c] text-[#b5bac1] hover:text-white transition" title="Desativar Áudio">
+          <i id="iconDeaf" data-lucide="headphones" class="w-4 h-4"></i>
+        </button>
+        <button onclick="openSettingsModal()" class="p-1.5 rounded hover:bg-[#35373c] text-[#b5bac1] hover:text-white transition" title="Configurações de Usuário">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </footer>
+  </aside>
+
+  <!-- 3. ÁREA PRINCIPAL (Stage de Vídeo/Tela + Chat) -->
+  <main class="flex-1 flex flex-col bg-[#313338] min-w-0 overflow-hidden relative">
+
+    <!-- Topbar do Canal Atual -->
+    <header class="h-12 border-b border-[#1f2023] px-4 flex items-center justify-between shadow-sm flex-shrink-0">
+      <div class="flex items-center gap-2 font-bold text-white">
+        <i data-lucide="message-square" class="w-5 h-5 text-amber-400"></i>
+        <span id="currentChannelTitle" class="text-base">resenha-tdl</span>
+        <span class="text-xs text-[#949ba4] font-normal border-l border-[#3f4147] pl-3 ml-1 hidden sm:inline">
+          Resenha oficial da Tropa do Liro (TDL) 🚀⚽
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2 text-[#b5bac1]">
+        <!-- Botão Atualizar Tela de Todos -->
+        <button onclick="triggerForceReloadAll()" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[#2b2d31] hover:bg-[#35373c] text-xs font-semibold text-amber-300 rounded border border-amber-500/30 transition shadow" title="Forçar atualização da tela de todos os membros sem precisar de F5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Atualizar Todos</span>
+        </button>
+
+        <!-- Botão Instalar App -->
+        <button id="btnInstallApp" onclick="installApp()" class="flex items-center gap-1.5 px-2.5 py-1 bg-[#5865f2] hover:bg-[#4752c4] text-xs font-bold text-white rounded transition shadow" title="Instalar TDL Discord como Aplicativo no PC ou Celular">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Baixar App</span>
+        </button>
+
+        <!-- Indicador de Status do WebSocket -->
+        <div id="wsIndicator" class="flex items-center gap-1.5 text-xs text-[#23a55a] px-1">
+          <span class="w-2 h-2 rounded-full bg-[#23a55a]"></span>
+          <span>Online</span>
+        </div>
+        <button onclick="toggleMemberList()" class="p-1.5 rounded hover:bg-[#35373c] hover:text-white transition" title="Lista de Membros">
+          <i data-lucide="users" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Conteúdo Central: Dividido em Stage de Voz (se ativo) e Chat -->
+    <div class="flex-1 flex flex-col min-h-0 relative">
+
+      <!-- STAGE DE VOZ E COMPARTILHAMENTO DE TELA (Expande quando conectado à chamada) -->
+      <section id="voiceStage" class="hidden bg-[#111214] border-b border-[#1f2023] flex flex-col p-3 transition-all duration-300" style="min-height: 280px; max-height: 60vh;">
+        
+        <!-- Barra de Ações do Stage (Tela, Câmera, Mutar, Desconectar) -->
+        <div class="flex items-center justify-between mb-3 px-2">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="radio" class="w-4 h-4 text-[#23a55a] animate-pulse"></i>
+              <span id="stageRoomName">Sala Principal</span>
+            </span>
+            <span id="stageUserCount" class="text-xs bg-[#2b2d31] text-[#949ba4] px-2 py-0.5 rounded-full">
+              1 participante
+            </span>
+          </div>
+
+          <!-- Botões de Transmissão & Qualidade Anti-Lag -->
+          <div class="flex items-center gap-2">
+            <!-- Seletor de Qualidade Anti-Lag -->
+            <select id="selectScreenQuality" class="bg-[#2b2d31] hover:bg-[#35373c] text-amber-400 text-xs font-semibold px-2 py-1.5 rounded-md outline-none border border-[#3f4147] cursor-pointer" title="Modo de Transmissão (Anti-Lag)">
+              <option value="optimized" selected>⚡ Otimizado (720p 30FPS — Sem Travar)</option>
+              <option value="light">🍃 Ultra Leve (720p 24FPS — Net/PC Fraco)</option>
+              <option value="fluid">🎮 Fluidez (720p 60FPS — Partidas Rápidas)</option>
+              <option value="hd">🚀 Alta Qualidade (1080p 30FPS — Nítido)</option>
+              <option value="ultra">💎 Máxima (1080p 60FPS — PC & Net Fortes)</option>
+            </select>
+
+            <!-- Compartilhar Tela -->
+            <button id="btnShareScreen" onclick="toggleScreenShare()" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#2b2d31] hover:bg-[#5865f2] text-white text-xs font-semibold transition shadow">
+              <i id="iconScreenShare" data-lucide="monitor-up" class="w-4 h-4"></i>
+              <span id="textScreenShare">Transmitir Tela</span>
+            </button>
+
+            <!-- Câmera -->
+            <button id="btnToggleCamera" onclick="toggleCamera()" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#2b2d31] hover:bg-[#35373c] text-white text-xs font-semibold transition shadow">
+              <i id="iconCamera" data-lucide="video" class="w-4 h-4"></i>
+              <span id="textCamera">Câmera</span>
+            </button>
+
+            <!-- Mutar Mic no Stage -->
+            <button id="btnStageMic" onclick="toggleMute()" class="p-2 rounded-md bg-[#2b2d31] hover:bg-[#35373c] text-white transition">
+              <i id="iconStageMic" data-lucide="mic" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Desconectar -->
+            <button onclick="leaveVoiceChannel()" class="p-2 rounded-md bg-[#da373c] hover:bg-[#a1282c] text-white transition" title="Sair da Chamada">
+              <i data-lucide="phone-off" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Grade de Vídeos / Telas e Participantes -->
+        <div id="videoGrid" class="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto p-1 items-stretch">
+          <!-- Os cards de vídeo ou participantes entram aqui dinamicamente -->
+        </div>
+      </section>
+
+      <!-- FEED DE MENSAGENS DO CHAT -->
+      <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 chat-messages">
+        <!-- As mensagens aparecem aqui dinamicamente -->
+      </div>
+
+      <!-- PREVIEW DE IMAGEM COLADA (CTRL+V) OU ANEXADA -->
+      <div id="imagePreviewTray" class="hidden px-4 py-2 bg-[#2b2d31] border-t border-[#1f2023] flex items-center gap-3">
+        <div class="relative group">
+          <img id="imagePreviewImg" src="" class="h-20 max-w-[200px] object-cover rounded-md border border-[#3f4147] shadow">
+          <button type="button" onclick="clearAttachedImage()" class="absolute -top-2 -right-2 bg-[#da373c] text-white rounded-full p-1 shadow hover:bg-red-700 transition" title="Remover foto">
+            <i data-lucide="x" class="w-3 h-3"></i>
+          </button>
+        </div>
+        <span class="text-xs text-[#dbdee1] flex items-center gap-1.5 font-medium">
+          <i data-lucide="image" class="w-4 h-4 text-amber-400"></i> Foto colada! Pressione <b>Enter</b> para enviar.
+        </span>
+      </div>
+
+      <!-- GAVETA DE FIGURINHAS (STICKERS TDL & ROCKET) -->
+      <div id="stickerDrawer" class="hidden mx-4 mb-2 p-3 bg-[#2b2d31] border border-[#3f4147] rounded-xl shadow-2xl z-30">
+        <div class="flex items-center justify-between mb-2 pb-1 border-b border-[#35373c]">
+          <span class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Figurinhas da Tropa
+          </span>
+          <button type="button" onclick="toggleStickerDrawer()" class="text-[#949ba4] hover:text-white">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <!-- Rocket League Quick Chats -->
+          <button type="button" onclick="sendSticker('What a Save! ⚽', 'from-blue-600 to-cyan-500')" class="bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>⚽ What a Save!</span>
+          </button>
+          <button type="button" onclick="sendSticker('Calculated. 🧠', 'from-amber-600 to-orange-500')" class="bg-gradient-to-r from-amber-600 to-orange-500 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>🧠 Calculated.</span>
+          </button>
+          <button type="button" onclick="sendSticker('Nice Shot! 🎯', 'from-green-600 to-emerald-500')" class="bg-gradient-to-r from-green-600 to-emerald-500 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>🎯 Nice Shot!</span>
+          </button>
+          <button type="button" onclick="sendSticker('É GOOOOL! 🔥', 'from-red-600 to-amber-500')" class="bg-gradient-to-r from-red-600 to-amber-500 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>🔥 É GOOOOL!</span>
+          </button>
+
+          <!-- Resenha TDL -->
+          <button type="button" onclick="sendSticker('Capotei 💀', 'from-zinc-700 to-zinc-600')" class="bg-gradient-to-r from-zinc-700 to-zinc-600 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>💀 Capotei</span>
+          </button>
+          <button type="button" onclick="sendSticker('Foguete sem ré 🚀', 'from-purple-600 to-indigo-500')" class="bg-gradient-to-r from-purple-600 to-indigo-500 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>🚀 Foguete sem ré</span>
+          </button>
+          <button type="button" onclick="sendSticker('Brabo da TDL 👑', 'from-amber-500 to-yellow-400')" class="bg-gradient-to-r from-amber-500 to-yellow-400 hover:scale-105 transition text-black font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>👑 Brabo da TDL</span>
+          </button>
+          <button type="button" onclick="sendSticker('GG WP 🤝', 'from-blue-700 to-indigo-600')" class="bg-gradient-to-r from-blue-700 to-indigo-600 hover:scale-105 transition text-white font-extrabold text-xs py-2.5 px-3 rounded-lg shadow flex items-center justify-center gap-1.5">
+            <span>🤝 GG WP</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BARRA DE INPUT DE MENSAGENS -->
+      <div class="p-4 pt-1 flex-shrink-0">
+        <input type="file" id="imageFileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+        <form id="chatForm" onsubmit="handleSendMessage(event)" class="bg-[#383a40] rounded-lg px-4 py-2.5 flex items-center gap-3 shadow-inner">
+          <button type="button" onclick="document.getElementById('imageFileInput').click()" class="text-[#b5bac1] hover:text-white transition" title="Colar foto ou anexar imagem">
+            <i data-lucide="plus-circle" class="w-6 h-6"></i>
+          </button>
+          <input id="chatInput" type="text" autocomplete="off" placeholder="Conversar em #resenha-tdl (ou cole fotos com Ctrl+V)" class="flex-1 bg-transparent text-white outline-none placeholder-[#80848e] text-sm">
+          <div class="flex items-center gap-2">
+            <!-- Botão de Figurinhas -->
+            <button type="button" onclick="toggleStickerDrawer()" class="text-lg hover:scale-110 transition" title="Figurinhas da TDL">🎭</button>
+            <button type="button" onclick="insertQuickEmoji('🔥')" class="text-lg hover:scale-110 transition" title="Emoji">🔥</button>
+            <button type="button" onclick="insertQuickEmoji('🚀')" class="text-lg hover:scale-110 transition" title="Emoji">🚀</button>
+            <button type="button" onclick="insertQuickEmoji('⚽')" class="text-lg hover:scale-110 transition" title="Emoji">⚽</button>
+            <button type="button" onclick="insertQuickEmoji('😂')" class="text-lg hover:scale-110 transition" title="Emoji">😂</button>
+            <button type="submit" class="p-1 rounded text-amber-400 hover:text-amber-300 transition" title="Enviar Mensagem">
+              <i data-lucide="send" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 4. LISTA LATERAL DE MEMBROS (Direita) -->
+  <aside id="memberSidebar" class="w-60 bg-[#2b2d31] flex flex-col flex-shrink-0 border-l border-[#1f2023] p-3 overflow-y-auto">
+    <div class="text-[12px] font-bold tracking-wider text-[#949ba4] uppercase mb-2">
+      Membros Conectados — <span id="memberCount">1</span>
+    </div>
+    <div id="membersList" class="space-y-1">
+      <!-- Lista preenchida via JS -->
+    </div>
+  </aside>
+
+  <!-- MODAL DE CONFIGURAÇÕES DE PERFIL AVANÇADO (Estilo Discord Nitro) -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/75 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+    <div class="bg-[#313338] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-[#232428] flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="p-5 border-b border-[#232428] flex items-center justify-between flex-shrink-0">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="user" class="w-5 h-5 text-[#5865f2]"></i> Perfil de Usuário
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-[#949ba4] hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Corpo com 2 Colunas: Edição à Esquerda, Preview do Card à Direita -->
+      <div class="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        <!-- Coluna de Edição -->
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Apelido no Servidor</label>
+            <input id="inputNickname" type="text" oninput="updateProfilePreview()" class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2.5 text-white text-sm focus:border-[#5865f2] outline-none">
+          </div>
+
+          <!-- Foto de Perfil / Avatar -->
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Foto de Perfil (Avatar)</label>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('customAvatarFileInput').click()" class="flex-1 px-3 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i> Subir Foto do PC
+                </button>
+                <input type="file" id="customAvatarFileInput" accept="image/*" class="hidden" onchange="handleCustomAvatarUpload(event)">
+              </div>
+              <div>
+                <span class="text-[11px] text-[#949ba4]">Ou escolha um gerador:</span>
+                <select id="selectAvatarStyle" onchange="onAvatarStyleChange()" class="mt-1 w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2 text-white text-xs focus:border-[#5865f2] outline-none">
+                  <option value="bottts">Robôs Futuristas (Bottts)</option>
+                  <option value="pixel-art">Pixel Art Gamer</option>
+                  <option value="adventurer">Aventureiro Fantasy</option>
+                  <option value="avataaars">Avatares Humanos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banner de Perfil (Estilo Nitro: Foto do PC ou Cor) -->
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Banner do Perfil (Estilo Nitro)</label>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('customBannerFileInput').click()" class="flex-1 px-3 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow">
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i> Subir Foto de Banner
+                </button>
+                <input type="file" id="customBannerFileInput" accept="image/*" class="hidden" onchange="handleCustomBannerUpload(event)">
+                <button type="button" onclick="removeCustomBannerImage()" id="btnRemoveBannerImage" class="hidden px-2.5 py-2 bg-[#da373c]/20 hover:bg-[#da373c] text-red-300 hover:text-white text-xs font-semibold rounded-lg transition" title="Remover imagem e usar cor">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Paleta de cores alternativa -->
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] text-[#949ba4]">Ou escolha uma cor sólida:</span>
+                <div class="flex items-center gap-1.5">
+                  <input id="inputBannerColor" type="color" value="#f59e0b" onchange="onBannerColorInputChange()" class="w-7 h-6 rounded border-none bg-transparent cursor-pointer">
+                  <div class="flex gap-1">
+                    <button type="button" onclick="setBannerColorPreset('#f59e0b')" class="w-5 h-5 rounded-full bg-[#f59e0b] border border-white/20" title="Dourado TDL"></button>
+                    <button type="button" onclick="setBannerColorPreset('#5865f2')" class="w-5 h-5 rounded-full bg-[#5865f2] border border-white/20" title="Blurple Discord"></button>
+                    <button type="button" onclick="setBannerColorPreset('#ef4444')" class="w-5 h-5 rounded-full bg-[#ef4444] border border-white/20" title="Vermelho"></button>
+                    <button type="button" onclick="setBannerColorPreset('#10b981')" class="w-5 h-5 rounded-full bg-[#10b981] border border-white/20" title="Esmeralda"></button>
+                    <button type="button" onclick="setBannerColorPreset('#8b5cf6')" class="w-5 h-5 rounded-full bg-[#8b5cf6] border border-white/20" title="Roxo Cyber"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cargo / Role -->
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Seu Cargo / Tag</label>
+            <select id="selectUserRole" onchange="updateProfilePreview()" class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2.5 text-white text-xs focus:border-[#5865f2] outline-none">
+              <!-- Preenchido dinamicamente via roles do serverConfig -->
+            </select>
+          </div>
+
+          <!-- Sobre Mim (Bio) -->
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1.5">Sobre Mim (Bio)</label>
+            <textarea id="inputBio" rows="2" maxlength="190" oninput="updateProfilePreview()" placeholder="Fale um pouco sobre você..." class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2.5 text-white text-xs focus:border-[#5865f2] outline-none resize-none"></textarea>
+          </div>
+
+          <!-- Painel Avançado de Áudio e Supressão de Ruído -->
+          <div class="p-3.5 bg-[#232428] rounded-xl border border-[#1f2023] space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-[#23a55a]"></i> Supressão Avançada Anti-Ruído
+              </div>
+              <span class="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-[#23a55a]/20 text-[#23a55a]">Ativo</span>
+            </div>
+
+            <!-- Filtros: Anti-Ventilador & Anti-Teclado -->
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <label class="flex items-center gap-2 p-2 bg-[#1e1f22] rounded-lg cursor-pointer border border-[#2b2d31] hover:border-amber-500/50 transition">
+                <input type="checkbox" id="checkHighpass" checked class="w-3.5 h-3.5 accent-amber-500 rounded" onchange="saveAudioSettings()">
+                <span class="text-white font-medium">Anti-Ventilador <span class="text-[#949ba4] block text-[9px]">Corta graves &lt;120Hz</span></span>
+              </label>
+              <label class="flex items-center gap-2 p-2 bg-[#1e1f22] rounded-lg cursor-pointer border border-[#2b2d31] hover:border-amber-500/50 transition">
+                <input type="checkbox" id="checkTypingCancel" checked class="w-3.5 h-3.5 accent-amber-500 rounded" onchange="saveAudioSettings()">
+                <span class="text-white font-medium">Anti-Teclado <span class="text-[#949ba4] block text-[9px]">Bloqueia cliques/teclas</span></span>
+              </label>
+            </div>
+
+            <!-- Portão de Ruído / Sensibilidade do Microfone (Noise Gate) -->
+            <div class="space-y-1.5 pt-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-[#b5bac1] flex items-center gap-1">
+                  <i data-lucide="sliders" class="w-3.5 h-3.5 text-amber-400"></i> Sensibilidade (Portão de Ruído)
+                </span>
+                <label class="flex items-center gap-1 text-[11px] text-[#949ba4] cursor-pointer">
+                  <input type="checkbox" id="checkAutoGate" checked class="accent-amber-500 w-3 h-3 rounded" onchange="toggleAutoGateUI()">
+                  <span>Automático</span>
+                </label>
+              </div>
+
+              <!-- Medidor de Volume em Tempo Real com Marcador de Corte -->
+              <div class="relative w-full h-3.5 bg-[#1e1f22] rounded-full overflow-hidden border border-[#35373c]">
+                <div id="micLiveLevelBar" class="h-full bg-gradient-to-r from-[#23a55a] via-amber-400 to-[#ef4444] transition-all duration-75" style="width: 0%;"></div>
+                <!-- Indicador do limiar (threshold) do Portão de Ruído -->
+                <div id="micGateThresholdMarker" class="absolute top-0 bottom-0 w-1 bg-white shadow-md transition-all pointer-events-none" style="left: 18%;"></div>
+              </div>
+
+              <div id="manualGateSliderContainer" class="flex items-center gap-2 pt-1 hidden">
+                <span class="text-[10px] text-[#949ba4] w-8">Corte:</span>
+                <input id="inputGateThreshold" type="range" min="3" max="50" value="18" oninput="onGateThresholdChange(this.value)" class="w-full accent-amber-500 h-1 bg-[#1e1f22] rounded cursor-pointer">
+                <span id="labelGateThreshold" class="text-[10px] text-amber-400 font-mono w-6 text-right">18</span>
+              </div>
+              <div class="text-[10px] text-[#949ba4] leading-tight">
+                Sons abaixo da barra branca (ventilador, respiração e cliques de teclado) são <strong>100% mutados em silêncio absoluto</strong>.
+              </div>
+            </div>
+
+            <!-- Botão Testar Microfone -->
+            <div class="pt-1">
+              <button type="button" id="btnTestMic" onclick="toggleTestMic()" class="w-full py-1.5 bg-[#1e1f22] hover:bg-[#2b2d31] border border-[#35373c] text-xs font-semibold text-[#dbdee1] rounded-lg transition flex items-center justify-center gap-2">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span id="btnTestMicText">Testar Microfone</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna de Prévia ao Vivo do Card do Discord -->
+        <div class="flex flex-col items-center justify-center">
+          <div class="text-xs font-bold text-[#949ba4] uppercase mb-2 tracking-wider">Prévia do seu Cartão</div>
+          <div class="w-full max-w-[260px] rounded-2xl overflow-hidden shadow-2xl border border-[#3f4147] bg-[#232428]">
+            <div id="previewBannerEl" class="h-20 bg-[#f59e0b] relative transition-all bg-cover bg-center overflow-hidden"></div>
+            <div class="px-3 pb-3 relative pt-1">
+              <div class="absolute -top-9 left-3">
+                <img id="previewModalAvatar" src="" class="w-14 h-14 rounded-full border-4 border-[#232428] bg-[#1e1f22] shadow object-cover">
+              </div>
+              <div class="mt-6">
+                <div id="previewModalNickname" class="text-sm font-extrabold text-white truncate">Nome</div>
+                <div id="previewModalRoleBadge" class="mt-0.5 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full text-white bg-amber-600">
+                  👑 FUNDADOR
+                </div>
+                <div class="h-[1px] bg-[#35373c] my-2"></div>
+                <div class="text-[9px] font-black uppercase text-[#949ba4] tracking-wider">Sobre Mim</div>
+                <p id="previewModalBio" class="text-[11px] text-[#dbdee1] break-words mt-0.5 leading-relaxed">
+                  Membro oficial da TDL 🚀
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="bg-[#2b2d31] p-4 flex justify-end gap-2 border-t border-[#232428] flex-shrink-0">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 text-sm text-[#dbdee1] hover:underline font-medium">Cancelar</button>
+        <button onclick="saveProfileSettings()" class="px-5 py-2 text-sm bg-[#5865f2] hover:bg-[#4752c4] text-white font-bold rounded-lg transition shadow">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CRIAÇÃO RÁPIDA DE CANAL -->
+  <div id="createChannelModal" class="fixed inset-0 bg-black/75 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+    <div class="bg-[#313338] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-[#232428]">
+      <div class="p-5 border-b border-[#232428] flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Criar Canal</h3>
+        <button onclick="closeCreateChannelModal()" class="text-[#949ba4] hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Tipo de Canal</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="p-3 rounded-lg bg-[#2b2d31] border border-transparent has-[:checked]:border-[#5865f2] has-[:checked]:bg-[#5865f2]/10 flex items-center gap-3 cursor-pointer">
+              <input type="radio" name="newChanType" value="text" checked onchange="updateChanPrefix()" class="accent-[#5865f2] w-4 h-4">
+              <div>
+                <div class="text-sm font-bold text-white flex items-center gap-1"># Texto</div>
+                <div class="text-[11px] text-[#949ba4]">Mensagens e fotos</div>
+              </div>
+            </label>
+            <label class="p-3 rounded-lg bg-[#2b2d31] border border-transparent has-[:checked]:border-[#5865f2] has-[:checked]:bg-[#5865f2]/10 flex items-center gap-3 cursor-pointer">
+              <input type="radio" name="newChanType" value="voice" onchange="updateChanPrefix()" class="accent-[#5865f2] w-4 h-4">
+              <div>
+                <div class="text-sm font-bold text-white flex items-center gap-1">🔊 Voz</div>
+                <div class="text-[11px] text-[#949ba4]">Conversa e tela</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome do Canal</label>
+          <div class="relative">
+            <span id="newChanPrefix" class="absolute left-3 top-3 text-[#949ba4] font-bold text-sm">#</span>
+            <input id="inputNewChannelName" type="text" placeholder="novo-canal" class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2.5 pl-8 text-white text-sm focus:border-[#5865f2] outline-none">
+          </div>
+        </div>
+
+        <div id="newChannelTopicContainer">
+          <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Tópico / Descrição (Opcional)</label>
+          <input id="inputNewChannelTopic" type="text" placeholder="Ex: Sala para torneios de fim de semana" class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-2.5 text-white text-sm focus:border-[#5865f2] outline-none">
+        </div>
+      </div>
+      <div class="bg-[#2b2d31] p-4 flex justify-end gap-2">
+        <button onclick="closeCreateChannelModal()" class="px-4 py-2 text-sm text-[#dbdee1] hover:underline font-medium">Cancelar</button>
+        <button onclick="submitCreateChannel()" class="px-5 py-2 text-sm bg-[#5865f2] hover:bg-[#4752c4] text-white font-bold rounded-lg transition shadow">Criar Canal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURAÇÕES DO SERVIDOR (Estilo Discord Oficial) -->
+  <div id="serverSettingsModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden p-4 backdrop-blur-md">
+    <div class="bg-[#313338] w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl flex overflow-hidden border border-[#232428]">
+      
+      <!-- Sidebar de Configurações do Servidor -->
+      <aside class="w-60 bg-[#2b2d31] p-5 flex flex-col justify-between border-r border-[#1f2023] select-none flex-shrink-0">
+        <div class="space-y-4">
+          <div class="text-xs font-black uppercase text-[#949ba4] tracking-wider px-2 truncate">
+            <span id="settingsServerTitle">TDL</span>
+          </div>
+          <nav class="space-y-1">
+            <button onclick="switchServerTab('overview')" id="tabBtn-overview" class="server-tab-btn active w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[#404249] transition">
+              <i data-lucide="info" class="w-4 h-4"></i>
+              <span>Visão Geral</span>
+            </button>
+            <button onclick="switchServerTab('channels')" id="tabBtn-channels" class="server-tab-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c] transition">
+              <i data-lucide="hash" class="w-4 h-4"></i>
+              <span>Canais</span>
+            </button>
+            <button onclick="switchServerTab('roles')" id="tabBtn-roles" class="server-tab-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c] transition">
+              <i data-lucide="shield" class="w-4 h-4"></i>
+              <span>Cargos & Roles</span>
+            </button>
+            <button onclick="switchServerTab('sounds')" id="tabBtn-sounds" class="server-tab-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c] transition">
+              <i data-lucide="megaphone" class="w-4 h-4"></i>
+              <span>Meme da Tropa</span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="pt-4 border-t border-[#35373c]">
+          <button onclick="closeServerSettingsModal()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-red-400 hover:bg-red-500/10 transition border border-red-500/20">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <span>Voltar ao Servidor</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Conteúdo das Abas do Servidor -->
+      <main class="flex-1 p-8 overflow-y-auto bg-[#313338] relative">
+        <button onclick="closeServerSettingsModal()" class="absolute top-6 right-6 flex flex-col items-center text-[#b5bac1] hover:text-white transition group">
+          <div class="w-9 h-9 rounded-full border-2 border-[#b5bac1] group-hover:border-white flex items-center justify-center">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </div>
+          <span class="text-[10px] font-bold mt-1 uppercase tracking-wider">ESC</span>
+        </button>
+
+        <!-- ABA 1: VISÃO GERAL -->
+        <div id="serverTab-overview" class="server-tab-content space-y-6 max-w-xl">
+          <h2 class="text-xl font-bold text-white">Visão Geral do Servidor</h2>
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Nome do Servidor</label>
+            <input id="inputServerName" type="text" class="w-full bg-[#1e1f22] border border-[#232428] rounded-lg p-3 text-white text-sm focus:border-[#5865f2] outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Ícone do Servidor</label>
+            <div class="flex items-center gap-4">
+              <div id="serverIconPreview" class="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-600 via-orange-600 to-amber-500 text-white flex items-center justify-center font-extrabold text-2xl shadow-xl border border-white/20 object-cover overflow-hidden">
+                TDL
+              </div>
+              <div class="space-y-2">
+                <button type="button" onclick="document.getElementById('serverIconFileInput').click()" class="px-4 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-md transition shadow flex items-center gap-1.5">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i> Subir Foto de Ícone
+                </button>
+                <input type="file" id="serverIconFileInput" accept="image/*" class="hidden" onchange="handleServerIconUpload(event)">
+                <div class="text-[11px] text-[#949ba4]">Recomendado: imagem quadrada de pelo menos 128x128.</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-2">Banner do Servidor</label>
+            <div class="space-y-3">
+              <div id="serverBannerPreview" class="w-full h-28 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 border border-white/20 shadow-inner flex items-center justify-center text-white/50 text-xs font-bold bg-cover bg-center overflow-hidden">
+                <span id="serverBannerPlaceholderText">Sem imagem de banner configurada</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('serverBannerFileInput').click()" class="px-4 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-md transition shadow flex items-center gap-1.5">
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i> Subir Foto de Banner do Servidor
+                </button>
+                <input type="file" id="serverBannerFileInput" accept="image/*" class="hidden" onchange="handleServerBannerUpload(event)">
+                <button type="button" onclick="removeServerBanner()" id="btnRemoveServerBanner" class="hidden px-3 py-2 bg-[#da373c]/20 hover:bg-[#da373c] text-red-300 hover:text-white text-xs font-semibold rounded-md transition">
+                  Remover Banner
+                </button>
+              </div>
+              <div class="text-[11px] text-[#949ba4]">Recomendado: 960x540 (formato widescreen 16:9). Exibido no topo dos canais.</div>
+            </div>
+          </div>
+          <div class="pt-4">
+            <button onclick="saveServerOverviewSettings()" class="px-6 py-2.5 bg-[#23a55a] hover:bg-[#1f9250] text-white text-sm font-bold rounded-lg shadow-lg transition">
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
+
+        <!-- ABA 2: CANAIS -->
+        <div id="serverTab-channels" class="server-tab-content hidden space-y-6 max-w-2xl">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-white">Gerenciador de Canais</h2>
+              <p class="text-xs text-[#949ba4] mt-0.5">Crie ou exclua canais do servidor em tempo real.</p>
+            </div>
+            <button onclick="openCreateChannelModal('text')" class="px-3.5 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded-lg flex items-center gap-2 transition shadow">
+              <i data-lucide="plus" class="w-4 h-4"></i> Criar Canal
+            </button>
+          </div>
+          <div class="space-y-3" id="serverSettingsChannelsList">
+            <!-- Renderizado via JS -->
+          </div>
+        </div>
+
+        <!-- ABA 3: CARGOS (ROLES) -->
+        <div id="serverTab-roles" class="server-tab-content hidden space-y-6 max-w-2xl">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-white">Cargos & Permissões</h2>
+              <p class="text-xs text-[#949ba4] mt-0.5">Crie cargos personalizados com cores exclusivas no chat.</p>
+            </div>
+            <button onclick="openNewRoleForm()" class="px-3.5 py-2 bg-[#23a55a] hover:bg-[#1f9250] text-white text-xs font-bold rounded-lg flex items-center gap-2 transition shadow">
+              <i data-lucide="plus" class="w-4 h-4"></i> Novo Cargo
+            </button>
+          </div>
+
+          <!-- Formulário de Novo Cargo -->
+          <div id="newRoleFormContainer" class="hidden p-4 bg-[#2b2d31] rounded-xl border border-[#3f4147] space-y-3">
+            <h4 class="text-sm font-bold text-white">Criar Novo Cargo</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Nome do Cargo</label>
+                <input id="inputNewRoleName" type="text" placeholder="Ex: 👑 Dono da Bola" class="w-full bg-[#1e1f22] border border-[#232428] rounded p-2 text-white text-xs outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Cor do Cargo</label>
+                <div class="flex items-center gap-2">
+                  <input id="inputNewRoleColor" type="color" value="#f59e0b" oninput="document.getElementById('newRoleColorHex').textContent = this.value" class="w-10 h-8 rounded border-none bg-transparent cursor-pointer">
+                  <span id="newRoleColorHex" class="text-xs text-white font-mono">#f59e0b</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button onclick="document.getElementById('newRoleFormContainer').classList.add('hidden')" class="px-3 py-1.5 text-xs text-[#b5bac1] hover:underline">Cancelar</button>
+              <button onclick="saveNewRole()" class="px-4 py-1.5 bg-[#5865f2] hover:bg-[#4752c4] text-white text-xs font-bold rounded">Criar</button>
+            </div>
+          </div>
+
+          <!-- Lista de Cargos -->
+          <div class="space-y-2" id="serverSettingsRolesList">
+            <!-- Renderizado via JS -->
+          </div>
+        </div>
+
+        <!-- ABA 4: MEME DA TROPA -->
+        <div id="serverTab-sounds" class="server-tab-content hidden space-y-6 max-w-xl">
+          <h2 class="text-xl font-bold text-white">Sons de Entrada da Call</h2>
+          <div class="p-4 bg-[#2b2d31] rounded-xl border border-amber-500/30 space-y-3">
+            <div class="text-sm font-bold text-amber-400">Grito do Breno ("AÍ MEU CU!")</div>
+            <p class="text-xs text-[#949ba4]">Toca automaticamente para todos quando qualquer pessoa entra na sala de voz.</p>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="testBrenoSound()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded transition">
+                ▶️ Ouvir Grito
+              </button>
+              <button onclick="toggleRecordBreno()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded transition">
+                🎙️ Gravar Breno Agora
+              </button>
+              <button onclick="document.getElementById('brenoAudioFileInput').click()" class="px-4 py-2 bg-[#35373c] hover:bg-[#404249] text-white text-xs font-bold rounded transition">
+                📁 Subir Áudio
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- POPOUT FLUTUANTE DE PERFIL (Estilo Discord Card Oficial) -->
+  <div id="userProfilePopout" class="fixed z-50 hidden w-72 rounded-2xl overflow-hidden shadow-2xl border border-[#3f4147] bg-[#232428] animate-in fade-in zoom-in-95 duration-150">
+    <!-- Banner Superior Colorido ou com Imagem -->
+    <div id="popoutBanner" class="h-24 bg-gradient-to-r from-amber-600 to-orange-500 relative transition-all bg-cover bg-center overflow-hidden">
+      <button onclick="closeUserProfilePopout()" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+    <!-- Avatar e Conteúdo -->
+    <div class="px-4 pb-4 relative pt-1 bg-[#232428]">
+      <div class="absolute -top-11 left-4">
+        <div class="relative">
+          <img id="popoutAvatar" src="" class="w-18 h-18 rounded-full border-4 border-[#232428] bg-[#1e1f22] shadow-xl object-cover">
+          <div class="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-[#23a55a] border-2 border-[#232428]"></div>
+        </div>
+      </div>
+      <div class="mt-8">
+        <div class="flex items-center gap-1.5">
+          <h4 id="popoutUsername" class="text-base font-extrabold text-white truncate">Nome do Usuário</h4>
+        </div>
+        <div id="popoutRoleBadge" class="mt-1 inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full text-white bg-amber-600">
+          👑 FUNDADOR
+        </div>
+
+        <div class="h-[1px] bg-[#35373c] my-3"></div>
+
+        <div class="space-y-1">
+          <div class="text-[10px] font-black uppercase text-[#949ba4] tracking-wider">Sobre Mim</div>
+          <p id="popoutBio" class="text-xs text-[#dbdee1] leading-relaxed break-words">
+            Membro oficial da TDL 🚀
+          </p>
+        </div>
+
+        <div id="popoutVolumeContainer" class="mt-3 pt-3 border-t border-[#35373c] space-y-1">
+          <div class="flex items-center justify-between text-[11px] text-[#949ba4]">
+            <span class="flex items-center gap-1"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Volume do Usuário</span>
+            <span id="popoutVolumeVal" class="font-bold text-white">100%</span>
+          </div>
+          <input id="popoutVolumeSlider" type="range" min="0" max="100" value="100" class="w-full accent-[#5865f2] h-1.5 bg-[#1e1f22] rounded-lg cursor-pointer">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE VISUALIZAÇÃO DE IMAGEM EM TELA CHEIA -->
+  <div id="imageModal" onclick="closeImageModal()" class="fixed inset-0 bg-black/85 z-50 flex items-center justify-center hidden p-4 cursor-pointer backdrop-blur-sm">
+    <div class="relative max-w-4xl max-h-[90vh]">
+      <img id="imageModalImg" src="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-[#3f4147]">
+      <button onclick="closeImageModal()" class="absolute -top-3 -right-3 bg-[#da373c] hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE INSTRUÇÕES DE INSTALAÇÃO DO APP (PWA) -->
+  <div id="installModal" class="fixed inset-0 bg-black/75 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+    <div class="bg-[#313338] w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-amber-500/30">
+      <div class="p-5 border-b border-[#232428] flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <img src="/static/icon.svg" class="w-8 h-8 rounded-lg shadow">
+          <h3 class="text-base font-bold text-white">Instalar App TDL Discord</h3>
+        </div>
+        <button onclick="closeInstallModal()" class="text-[#949ba4] hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 text-sm text-[#dbdee1]">
+        <p class="text-xs text-[#949ba4]">
+          Instale o TDL como um aplicativo nativo no seu computador ou celular sem precisar baixar nenhum instalador pesado!
+        </p>
+
+        <div class="space-y-3 bg-[#2b2d31] p-3.5 rounded-lg border border-[#3f4147]">
+          <div class="flex items-start gap-2.5">
+            <span class="text-base">💻</span>
+            <div>
+              <div class="font-bold text-white text-xs">No Computador (Chrome / Edge / Opera)</div>
+              <div class="text-xs text-[#b5bac1] mt-0.5">
+                Clique no ícone de <b>Instalar (computador com setinha)</b> na barra de endereços do navegador (canto superior direito) ou no menu <b>⋯ > Aplicativos > Instalar este site como aplicativo</b>.
+              </div>
+            </div>
+          </div>
+          <div class="border-t border-[#383a40] pt-2.5 flex items-start gap-2.5">
+            <span class="text-base">📱</span>
+            <div>
+              <div class="font-bold text-white text-xs">No Celular (Android / iPhone)</div>
+              <div class="text-xs text-[#b5bac1] mt-0.5">
+                No Android (Chrome): Menu <b>⋮ > Adicionar à Tela Inicial / Instalar App</b>.<br>
+                No iPhone (Safari): Botão <b>Compartilhar > Adicionar à Tela de Início</b>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+          ✨ <b>Vantagem:</b> Ele abre em janela própria sem abas de navegador, tem ícone próprio na barra de tarefas e <b>atualiza sozinho</b> quando o dono fizer melhorias!
+        </div>
+      </div>
+      <div class="bg-[#2b2d31] p-3.5 flex justify-end">
+        <button onclick="closeInstallModal()" class="px-4 py-1.5 text-xs bg-[#5865f2] hover:bg-[#4752c4] text-white font-bold rounded transition">Entendido!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio elements invisíveis para reprodução WebRTC de outros usuários -->
+  <div id="remoteAudioContainer" class="hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

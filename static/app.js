@@ -86,12 +86,39 @@ const channelMessages = {
   'clipes-e-jogadas': [],
   'comandos': []
 };
+
+function loadLocalChatHistory() {
+  try {
+    const raw = localStorage.getItem('tdl_chat_history_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      for (const [ch, msgs] of Object.entries(parsed)) {
+        if (Array.isArray(msgs)) {
+          channelMessages[ch] = msgs;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao carregar histórico local:", e);
+  }
+}
+
+function saveLocalChatHistory() {
+  try {
+    localStorage.setItem('tdl_chat_history_v1', JSON.stringify(channelMessages));
+  } catch (e) {
+    console.warn("Erro ao salvar histórico local:", e);
+  }
+}
+
 let serverUsers = [];
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+  loadLocalChatHistory();
   lucide.createIcons();
   updateMyProfileUI();
+  renderMessages();
   connectWebSocket();
 });
 
@@ -251,13 +278,17 @@ function sendWS(data) {
 // 2. ESTADO INICIAL E CHAT
 // ----------------------------------------------------
 function handleInitState(data) {
-  // Verificação de Atualização Automática (Hot Sync sem F5)
+  // Verificação de Atualização (Nunca derruba chamada ativa nem dá F5 surpresa!)
   if (data.buildTime) {
     if (!window._tdlBuildTime) {
       window._tdlBuildTime = data.buildTime;
     } else if (window._tdlBuildTime !== data.buildTime) {
-      showUpdateToastAndReload("🚀 Nova atualização do servidor detectada! Sincronizando...");
-      return;
+      window._tdlBuildTime = data.buildTime;
+      if (!currentVoiceChannel && !isScreenSharing) {
+        showUpdateToastNotice("🚀 Nova atualização do servidor detectada! Clique para sincronizar.");
+      } else {
+        console.log("[TDL] Nova versão detectada, mas usuário está em chamada/transmissão. Reload evitado.");
+      }
     }
   }
 
@@ -277,8 +308,19 @@ function handleInitState(data) {
 
   if (data.history) {
     for (const [ch, msgs] of Object.entries(data.history)) {
-      channelMessages[ch] = msgs;
+      if (!channelMessages[ch]) channelMessages[ch] = [];
+      const seen = new Set(channelMessages[ch].map(m => m.id || `${m.userId || ''}-${m.timestamp || ''}-${m.text || ''}`));
+      msgs.forEach(m => {
+        const key = m.id || `${m.userId || ''}-${m.timestamp || ''}-${m.text || ''}`;
+        if (!seen.has(key)) {
+          channelMessages[ch].push(m);
+          seen.add(key);
+        }
+      });
+      // Ordenar por data se houver
+      channelMessages[ch].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     }
+    saveLocalChatHistory();
     renderMessages();
   }
 }
@@ -394,7 +436,12 @@ function handleNewChatMessage(msg) {
   if (!channelMessages[msg.channel]) {
     channelMessages[msg.channel] = [];
   }
-  channelMessages[msg.channel].push(msg);
+  const key = msg.id || `${msg.userId || ''}-${msg.timestamp || ''}-${msg.text || ''}`;
+  const exists = channelMessages[msg.channel].some(m => (m.id && msg.id && m.id === msg.id) || (`${m.userId || ''}-${m.timestamp || ''}-${m.text || ''}` === key));
+  if (!exists) {
+    channelMessages[msg.channel].push(msg);
+    saveLocalChatHistory();
+  }
 
   if (msg.channel === currentTextChannel) {
     appendMessageUI(msg);
@@ -639,6 +686,28 @@ function leaveVoiceChannel(notifyServer = true) {
   resetMediaButtonsUI();
 }
 
+// Helper para adicionar ou reutilizar tracks no RTCPeerConnection sem erro de duplicação
+function addTrackSafely(pc, track, stream) {
+  if (!track || !pc) return null;
+  try {
+    const senders = pc.getSenders ? pc.getSenders() : [];
+    const existing = senders.find(s => s.track && s.track.id === track.id);
+    if (existing) {
+      return existing;
+    }
+    // Se existir sender vazio do mesmo tipo, reutiliza com replaceTrack
+    const reusable = senders.find(s => !s.track && s.kind === track.kind);
+    if (reusable && reusable.replaceTrack) {
+      reusable.replaceTrack(track);
+      return reusable;
+    }
+    return pc.addTrack(track, stream);
+  } catch (e) {
+    console.warn("[WebRTC] Aviso ao adicionar track:", e);
+    return null;
+  }
+}
+
 async function handleJoinedVoiceSuccess(channelName, existingMembers) {
   // Renderizar imediatamente todos os membros que já estavam na chamada
   for (const member of existingMembers) {
@@ -658,24 +727,42 @@ async function handleUserJoinedVoice(user, channelName) {
   playDiscordSound('join');
   setTimeout(playBrenoEntranceSound, 300);
 
-  // Se já estiver transmitindo tela, garantir envio para o novo usuário
+  // Se já estiver transmitindo tela, garantir envio para o novo usuário de forma segura
   if (isScreenSharing && localScreenStream) {
     setTimeout(async () => {
-      const pc = await createPeerConnection(user.id, user.username, true);
+      let conn = peerConnections[user.id];
+      let pc;
+      if (!conn) {
+        pc = await createPeerConnection(user.id, user.username, true);
+        conn = peerConnections[user.id];
+      } else {
+        pc = conn.pc;
+      }
+
       if (pc) {
         localScreenStream.getTracks().forEach(track => {
-          const sender = pc.addTrack(track, localScreenStream);
-          if (track.kind === 'video') tuneSenderBitrate(sender);
+          const sender = addTrackSafely(pc, track, localScreenStream);
+          if (track.kind === 'video' && sender) {
+            tuneSenderBitrate(sender);
+          }
         });
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendWS({
-          type: 'webrtc_signal',
-          targetId: user.id,
-          signal: { sdp: pc.localDescription }
-        });
+
+        // Se a conexão já estiver estável, renegocia a oferta com a tela
+        if (pc.signalingState === 'stable') {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            sendWS({
+              type: 'webrtc_signal',
+              targetId: user.id,
+              signal: { sdp: pc.localDescription }
+            });
+          } catch (e) {
+            console.warn("[WebRTC] Erro ao renegociar tela para novo membro:", e);
+          }
+        }
       }
-    }, 500);
+    }, 600);
   }
 }
 
@@ -686,7 +773,7 @@ function handleUserLeftVoice(userId) {
   playDiscordSound('leave');
 }
 
-// Criar PeerConnection WebRTC
+// Criar PeerConnection WebRTC com padrão Perfect Negotiation e fila de ICE
 async function createPeerConnection(targetId, targetUsername, isInitiator) {
   if (peerConnections[targetId]) {
     return peerConnections[targetId].pc;
@@ -696,27 +783,33 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
   const connData = {
     pc,
     targetUsername,
+    targetId,
     remoteAudioEl: null,
-    remoteVideoEl: null
+    remoteVideoEl: null,
+    iceQueue: [],
+    isPolite: myId < targetId, // Determinístico: id menor é o polite peer
+    isMakingOffer: false
   };
   peerConnections[targetId] = connData;
 
-  // Adicionar tracks locais de áudio do microfone
+  // Adicionar tracks locais de áudio do microfone com segurança
   if (localAudioStream) {
     localAudioStream.getAudioTracks().forEach(track => {
-      pc.addTrack(track, localAudioStream);
+      addTrackSafely(pc, track, localAudioStream);
     });
   }
 
   // Adicionar tracks de tela/câmera se já estiver transmitindo
   if (localScreenStream) {
     localScreenStream.getTracks().forEach(track => {
-      const sender = pc.addTrack(track, localScreenStream);
-      if (track.kind === 'video') tuneSenderBitrate(sender);
+      const sender = addTrackSafely(pc, track, localScreenStream);
+      if (track.kind === 'video' && sender) {
+        tuneSenderBitrate(sender);
+      }
     });
   } else if (localCameraStream) {
     localCameraStream.getTracks().forEach(track => {
-      pc.addTrack(track, localCameraStream);
+      addTrackSafely(pc, track, localCameraStream);
     });
   }
 
@@ -736,20 +829,15 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
     const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
     const track = event.track;
 
-    // Se a track for de VÍDEO, só cria card se estiver ao vivo (evita tela preta!)
     if (track.kind === 'video') {
-      if (track.readyState === 'live') {
-        attachRemoteVideo(targetId, targetUsername, stream);
-        track.onended = () => removeRemoteVideo(targetId);
-        track.onmute = () => removeRemoteVideo(targetId);
-        track.onunmute = () => attachRemoteVideo(targetId, targetUsername, stream);
-      }
+      attachRemoteVideo(targetId, targetUsername, stream);
+      track.onended = () => removeRemoteVideo(targetId);
+      track.onunmute = () => attachRemoteVideo(targetId, targetUsername, stream);
+      // Nunca removemos o card no onmute (evita tela sumir em oscilações)
     } else if (track.kind === 'audio') {
-      // Se este áudio veio da transmissão de tela (stream com vídeo), anexa à tela
       if (stream.getVideoTracks().length > 0) {
         attachRemoteVideo(targetId, targetUsername, stream);
       } else {
-        // Áudio do microfone (voz dos amigos)
         let audioEl = connData.remoteAudioEl;
         if (!audioEl) {
           audioEl = document.createElement('audio');
@@ -773,6 +861,7 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
   // Se for o iniciador da chamada para esse peer, criar Oferta SDP
   if (isInitiator) {
     try {
+      connData.isMakingOffer = true;
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       sendWS({
@@ -782,13 +871,15 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
       });
     } catch (e) {
       console.error("Erro ao criar oferta WebRTC:", e);
+    } finally {
+      connData.isMakingOffer = false;
     }
   }
 
   return pc;
 }
 
-// Tratar sinalização WebRTC recebida do servidor
+// Tratar sinalização WebRTC recebida do servidor com prevenção de Glare e Fila ICE
 async function handleWebRTCSignal(data) {
   const senderId = data.senderId;
   const signal = data.signal;
@@ -802,22 +893,78 @@ async function handleWebRTCSignal(data) {
   const pc = conn.pc;
 
   if (signal.sdp) {
-    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+    try {
+      const isOffer = signal.sdp.type === 'offer';
+      const offerCollision = isOffer && (conn.isMakingOffer || pc.signalingState !== 'stable');
 
-    if (signal.sdp.type === 'offer') {
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      sendWS({
-        type: 'webrtc_signal',
-        targetId: senderId,
-        signal: { sdp: pc.localDescription }
-      });
+      if (offerCollision) {
+        if (!conn.isPolite) {
+          console.log(`[WebRTC] Glare evitado com ${senderId} (impolite peer manteve oferta).`);
+          return;
+        }
+        console.log(`[WebRTC] Polite peer recuando (rollback) para aceitar oferta de ${senderId}.`);
+        await pc.setLocalDescription({ type: 'rollback' }).catch(() => {});
+      }
+
+      await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+
+      // Drenar candidatos ICE em espera
+      if (conn.iceQueue && conn.iceQueue.length > 0) {
+        while (conn.iceQueue.length > 0) {
+          const cand = conn.iceQueue.shift();
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (iceErr) {
+            console.warn("Erro ao drenar ICE candidate:", iceErr);
+          }
+        }
+      }
+
+      if (isOffer) {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendWS({
+          type: 'webrtc_signal',
+          targetId: senderId,
+          signal: { sdp: pc.localDescription }
+        });
+
+        // Se estamos transmitindo tela e o novo peer conectou, renegociar para enviar o vídeo
+        if (isScreenSharing && localScreenStream) {
+          setTimeout(async () => {
+            if (pc.signalingState === 'stable') {
+              localScreenStream.getTracks().forEach(t => {
+                const s = addTrackSafely(pc, t, localScreenStream);
+                if (t.kind === 'video' && s) tuneSenderBitrate(s);
+              });
+              try {
+                const renegotiateOffer = await pc.createOffer();
+                await pc.setLocalDescription(renegotiateOffer);
+                sendWS({
+                  type: 'webrtc_signal',
+                  targetId: senderId,
+                  signal: { sdp: pc.localDescription }
+                });
+              } catch (reErr) {
+                console.warn("[WebRTC] Erro ao renegociar tela pós-answer:", reErr);
+              }
+            }
+          }, 300);
+        }
+      }
+    } catch (err) {
+      console.error("[WebRTC] Erro no processamento de sinal SDP:", err);
     }
   } else if (signal.ice) {
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
-    } catch (e) {
-      console.warn("Erro ao adicionar ICE candidate:", e);
+    if (pc.remoteDescription && pc.remoteDescription.type) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
+      } catch (e) {
+        console.warn("Erro ao adicionar ICE candidate:", e);
+      }
+    } else {
+      if (!conn.iceQueue) conn.iceQueue = [];
+      conn.iceQueue.push(signal.ice);
     }
   }
 }
@@ -832,8 +979,8 @@ function closePeerConnection(peerId) {
   removeUserFromStageGrid(peerId);
 }
 
-// Ajustar parâmetros de vídeo para alta taxa de bits e modo anti-lag
-async function tuneSenderBitrate(sender, targetBitrate = 3500000) {
+// Ajustar parâmetros de vídeo para taxa de bits controlada e modo anti-lag
+async function tuneSenderBitrate(sender, targetBitrate = 1800000, targetFps = 30) {
   if (!sender) return;
   try {
     const params = sender.getParameters();
@@ -841,9 +988,9 @@ async function tuneSenderBitrate(sender, targetBitrate = 3500000) {
       params.encodings = [{}];
     }
     params.encodings[0].maxBitrate = targetBitrate;
-    params.encodings[0].maxFramerate = 60;
-    // maintain-framerate garante que o jogo nunca fique travando ou com delay
-    params.degradationPreference = 'maintain-framerate';
+    params.encodings[0].maxFramerate = targetFps;
+    // 'balanced' adapta a resolução sem estourar o processador e sem travar o jogo
+    params.degradationPreference = 'balanced';
     await sender.setParameters(params);
   } catch (e) {
     // Aplicado pelo navegador
@@ -851,7 +998,7 @@ async function tuneSenderBitrate(sender, targetBitrate = 3500000) {
 }
 
 // ----------------------------------------------------
-// 4. COMPARTILHAMENTO DE TELA & CÂMERA
+// 4. COMPARTILHAMENTO DE TELA & CÂMERA (LEVE & ANTI-LAG)
 // ----------------------------------------------------
 async function toggleScreenShare() {
   if (isScreenSharing) {
@@ -861,24 +1008,32 @@ async function toggleScreenShare() {
 
   try {
     const quality = document.getElementById('selectScreenQuality') ? document.getElementById('selectScreenQuality').value : 'optimized';
-    let idealW = 1280, idealH = 720, targetBitrate = 3500000;
-    if (quality === 'hd') {
-      idealW = 1920; idealH = 1080; targetBitrate = 6000000;
+    let idealW = 1280, idealH = 720, targetBitrate = 1800000, targetFps = 30;
+
+    if (quality === 'light') {
+      idealW = 1280; idealH = 720; targetBitrate = 1200000; targetFps = 24;
+    } else if (quality === 'optimized') {
+      // 720p 30fps: Perfeito para Rocket League sem pesar nada
+      idealW = 1280; idealH = 720; targetBitrate = 1800000; targetFps = 30;
+    } else if (quality === 'fluid') {
+      idealW = 1280; idealH = 720; targetBitrate = 2800000; targetFps = 60;
+    } else if (quality === 'hd') {
+      idealW = 1920; idealH = 1080; targetBitrate = 3200000; targetFps = 30;
     } else if (quality === 'ultra') {
-      idealW = 2560; idealH = 1440; targetBitrate = 8500000;
+      idealW = 1920; idealH = 1080; targetBitrate = 4500000; targetFps = 60;
     }
 
-    // Captura de tela otimizada com 60 FPS
+    // Captura de tela otimizada com controle de FPS
     localScreenStream = await navigator.mediaDevices.getDisplayMedia({
       video: {
         cursor: "always",
         displaySurface: "monitor",
         width: { ideal: idealW, max: idealW },
         height: { ideal: idealH, max: idealH },
-        frameRate: { ideal: 60, max: 60 }
+        frameRate: { ideal: targetFps, max: targetFps }
       },
       audio: {
-        autoGainControl: false,
+        autoGainControl: true,
         echoCancellation: false,
         noiseSuppression: false,
         channelCount: 2,
@@ -889,11 +1044,13 @@ async function toggleScreenShare() {
     isScreenSharing = true;
     updateScreenShareUI(true);
 
-    // Se o usuário parar de compartilhar pela barra do próprio navegador
     const videoTrack = localScreenStream.getVideoTracks()[0];
-    videoTrack.onended = () => {
-      stopScreenShare();
-    };
+    if (videoTrack) {
+      videoTrack.contentHint = 'motion';
+      videoTrack.onended = () => {
+        stopScreenShare();
+      };
+    }
 
     // Renderizar preview local no Stage
     renderLocalVideo(localScreenStream, 'Tela de ' + myUsername);
@@ -902,19 +1059,26 @@ async function toggleScreenShare() {
     for (const peerId in peerConnections) {
       const pc = peerConnections[peerId].pc;
       localScreenStream.getTracks().forEach(track => {
-        const sender = pc.addTrack(track, localScreenStream);
-        if (track.kind === 'video') {
-          tuneSenderBitrate(sender, targetBitrate);
+        const sender = addTrackSafely(pc, track, localScreenStream);
+        if (track.kind === 'video' && sender) {
+          tuneSenderBitrate(sender, targetBitrate, targetFps);
         }
       });
-      // Renegociar oferta
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendWS({
-        type: 'webrtc_signal',
-        targetId: peerId,
-        signal: { sdp: pc.localDescription }
-      });
+
+      // Renegociar oferta de forma segura
+      if (pc.signalingState === 'stable') {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendWS({
+            type: 'webrtc_signal',
+            targetId: peerId,
+            signal: { sdp: pc.localDescription }
+          });
+        } catch (e) {
+          console.warn("[WebRTC] Erro ao renegociar tela com peer:", peerId, e);
+        }
+      }
     }
 
     sendWS({
@@ -948,16 +1112,18 @@ function stopScreenShare() {
     const senders = pc.getSenders();
     senders.forEach(sender => {
       if (sender.track && sender.track.kind === 'video') {
-        pc.removeTrack(sender);
+        try { pc.removeTrack(sender); } catch (e) {}
       }
     });
-    pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
-      sendWS({
-        type: 'webrtc_signal',
-        targetId: peerId,
-        signal: { sdp: pc.localDescription }
-      });
-    }).catch(e => console.warn(e));
+    if (pc.signalingState === 'stable') {
+      pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+        sendWS({
+          type: 'webrtc_signal',
+          targetId: peerId,
+          signal: { sdp: pc.localDescription }
+        });
+      }).catch(e => console.warn(e));
+    }
   }
 }
 
@@ -2476,7 +2642,27 @@ async function uploadBrenoAudioFile(event) {
 // ----------------------------------------------------
 // 9. AUTO-UPDATE (HOT SYNC SEM F5) & APLICATIVO PWA
 // ----------------------------------------------------
+function showUpdateToastNotice(msg) {
+  if (document.getElementById('tdlUpdateNotice')) return;
+
+  const toast = document.createElement('div');
+  toast.id = 'tdlUpdateNotice';
+  toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-[#2b2d31] text-amber-400 font-bold px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 border border-amber-500/40 text-xs tracking-wide transition';
+  toast.innerHTML = `
+    <span>${msg}</span>
+    <button onclick="window.location.reload()" class="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-1 rounded-md text-[11px] font-extrabold transition">Atualizar</button>
+    <button onclick="this.parentElement.remove()" class="text-[#949ba4] hover:text-white text-sm font-bold ml-1">✕</button>
+  `;
+  document.body.appendChild(toast);
+}
+
 function showUpdateToastAndReload(msg) {
+  // Se estiver em chamada de voz ou transmitindo tela, NUNCA dá reload forçado!
+  if (currentVoiceChannel || isScreenSharing) {
+    showUpdateToastNotice("⚡ Nova versão disponível no servidor.");
+    return;
+  }
+
   // Evita múltiplos toasts simultâneos
   if (document.getElementById('tdlUpdateToast')) return;
 

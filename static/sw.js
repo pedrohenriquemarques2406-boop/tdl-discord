@@ -1,4 +1,4 @@
-// Service Worker para PWA TDL Discord
+﻿// Service Worker para PWA TDL Discord
 const CACHE_NAME = 'tdl-cache-v1';
 
 self.addEventListener('install', (event) => {
@@ -10,6 +10,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass-through para WebSocket e requisições dinâmicas
+  // Pass-through para WebSocket e requisiÃ§Ãµes dinÃ¢micas
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
+
