@@ -115,6 +115,22 @@ let serverUsers = [];
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+  // Auto-cura do container de áudio para navegadores não suspenderem o som
+  const audioCont = document.getElementById('remoteAudioContainer');
+  if (audioCont) {
+    audioCont.classList.remove('hidden');
+    audioCont.style.cssText = 'position:fixed;bottom:0;right:0;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-1;';
+  }
+  // Remover botões ou abas legadas do meme do Breno se ainda existirem no DOM
+  document.querySelectorAll('#serverTab-sounds, #tabBtn-sounds').forEach(el => el.remove());
+  document.querySelectorAll('button').forEach(b => {
+    if (b.textContent && b.textContent.includes('Breno')) {
+      const parent = b.closest('.pt-2');
+      if (parent) parent.remove();
+      else b.remove();
+    }
+  });
+
   loadLocalChatHistory();
   lucide.createIcons();
   updateMyProfileUI();
@@ -844,10 +860,16 @@ async function createPeerConnection(targetId, targetUsername, isInitiator) {
     const track = event.track;
 
     if (track.kind === 'video') {
+      try { track.contentHint = 'motion'; } catch (e) {}
       attachRemoteVideo(targetId, targetUsername, stream);
       track.onended = () => removeRemoteVideo(targetId);
-      track.onunmute = () => attachRemoteVideo(targetId, targetUsername, stream);
-      // Nunca removemos o card no onmute (evita tela sumir em oscilações)
+      track.onunmute = () => {
+        const video = document.getElementById(`remote-video-${targetId}`);
+        if (video && video.paused) {
+          video.play().catch(() => {});
+        }
+      };
+      // Nunca removemos o card no onmute (mantém o último quadro visível em oscilações, evitando tela preta)
     } else if (track.kind === 'audio') {
       if (stream.getVideoTracks().length > 0) {
         attachRemoteVideo(targetId, targetUsername, stream);
@@ -1008,8 +1030,8 @@ async function tuneSenderBitrate(sender, targetBitrate = 1800000, targetFps = 30
     }
     params.encodings[0].maxBitrate = targetBitrate;
     params.encodings[0].maxFramerate = targetFps;
-    // 'balanced' adapta a resolução sem estourar o processador e sem travar o jogo
-    params.degradationPreference = 'balanced';
+    // 'maintain-framerate' prioriza fluidez contínua sem deixar a taxa de quadros cair para zero (elimina tela preta)
+    params.degradationPreference = 'maintain-framerate';
     await sender.setParameters(params);
   } catch (e) {
     // Aplicado pelo navegador
@@ -1046,7 +1068,6 @@ async function toggleScreenShare() {
     localScreenStream = await navigator.mediaDevices.getDisplayMedia({
       video: {
         cursor: "always",
-        displaySurface: "monitor",
         width: { ideal: idealW, max: idealW },
         height: { ideal: idealH, max: idealH },
         frameRate: { ideal: targetFps, max: targetFps }
@@ -1372,11 +1393,21 @@ function attachRemoteVideo(targetId, targetUsername, stream) {
 
   const video = document.getElementById(`remote-video-${targetId}`);
   if (video) {
-    video.srcObject = stream;
-    video.muted = true; // OBRIGATÓRIO: muted para o navegador NUNCA bloquear autoplay da tela!
-    video.play().catch(e => {
-      console.warn("Aviso de reprodução de vídeo:", e);
-    });
+    // SÓ altera srcObject se o stream for realmente diferente (reatribuir o mesmo stream reseta o decodificador e pisca preto!)
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+    video.muted = true;
+    video.playsInline = true;
+    if (video.paused) {
+      video.play().catch(e => console.warn("Aviso de reprodução de vídeo:", e));
+    }
+    // Auto-recuperação: se o navegador pausar o vídeo em oscilações de foco, despausa na hora
+    video.onpause = () => {
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+    };
   }
 
   // Reproduzir áudio da transmissão via elemento de áudio dedicado
@@ -1389,12 +1420,16 @@ function attachRemoteVideo(targetId, targetUsername, stream) {
       streamAudio.autoplay = true;
       document.getElementById('remoteAudioContainer').appendChild(streamAudio);
     }
-    streamAudio.srcObject = new MediaStream(audioTracks);
+    if (streamAudio.srcObject !== stream) {
+      streamAudio.srcObject = new MediaStream(audioTracks);
+    }
     streamAudio.volume = 0.5;
-    streamAudio.play().catch(e => {
-      console.warn("Áudio da transmissão aguardando interação:", e);
-      showAudioUnlockBanner();
-    });
+    if (streamAudio.paused) {
+      streamAudio.play().catch(e => {
+        console.warn("Áudio da transmissão aguardando interação:", e);
+        showAudioUnlockBanner();
+      });
+    }
   }
 }
 
